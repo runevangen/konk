@@ -109,7 +109,7 @@ input.pin { font-size: 2rem; letter-spacing: .5em; text-align: center; font-vari
 .score-grid label { position: relative; }
 .score-grid input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
 .score-grid span { display: flex; align-items: center; justify-content: center; min-height: 56px; border-radius: 12px; border: 2px solid var(--border-strong); background: #fff; font: 700 1.3rem Georgia, serif; color: var(--ink); }
-.score-grid input:checked + span { background: var(--red); color: var(--on-red); border-color: var(--red); }
+.score-grid span.on { background: var(--red); color: var(--on-red); border-color: var(--red); }
 .score-grid input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 6px var(--focus-ring); }
 .score-grid input:disabled + span { opacity: .6; }
 fieldset { border: 0; padding: 0; margin: 0 0 14px; }
@@ -118,7 +118,7 @@ legend { font-weight: 700; padding: 0; }
 .option-list label { position: relative; display: block; }
 .option-list input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
 .option-list span { display: block; padding: 12px 14px; min-height: 48px; border: 2px solid var(--border-strong); background: #fff; border-radius: 12px; }
-.option-list input:checked + span { background: var(--green); border-color: var(--green); color: var(--on-green); font-weight: 700; }
+.option-list span.on { background: var(--green); border-color: var(--green); color: var(--on-green); font-weight: 700; }
 .option-list input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 6px var(--focus-ring); }
 .stepper-nav { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg-2); border-top: 3px solid var(--gold); padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom)); z-index: 15; }
 .stepper-nav-inner { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; }
