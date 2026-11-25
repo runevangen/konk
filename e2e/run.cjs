@@ -46,6 +46,11 @@ function makeBackend(state) {
     state.calls.push(`${req.method()} ${p}${url.search}`)
     if (p.endsWith('/functions/v1/konk-auth')) {
       const b = req.postDataJSON()
+      if (b.action === 'change_pin') {
+        state.pinChange = b
+        if (b.old_pin !== '123456') return json({ error: 'invalid_pin' }, 401)
+        return json({ ok: true })
+      }
       if (b.action === 'register') { state.registered = b; return json({ pin: '482915', session: session() }) }
       if (b.pin === '123456' && String(b.display_name || '').trim().toLowerCase() === 'kari') return json({ session: session() })
       return json({ error: 'invalid_pin' }, 401)
@@ -314,9 +319,31 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByText('Lagret.').waitFor()
     assert.deepStrictEqual(state.profilePatch, { display_name: 'Kari N', anonymous: true })
     await shot(page, '06-profil')
+    // bytt pinkode: feil nåværende, svak kode, ulike koder, og vellykket bytte
+    await page.getByLabel('Nåværende pinkode').fill('000000')
+    await page.getByLabel('Ny pinkode', { exact: true }).fill('482915')
+    await page.getByLabel('Gjenta ny pinkode').fill('482915')
+    await page.getByRole('button', { name: 'Bytt pinkode' }).click()
+    await page.getByText('Feil nåværende pinkode.').waitFor()
+    await page.getByLabel('Nåværende pinkode').fill('123456')
+    await page.getByLabel('Ny pinkode', { exact: true }).fill('111111')
+    await page.getByLabel('Gjenta ny pinkode').fill('111111')
+    await page.getByRole('button', { name: 'Bytt pinkode' }).click()
+    await page.getByText(/vanskeligere å gjette/).waitFor()
+    await page.getByLabel('Ny pinkode', { exact: true }).fill('482915')
+    await page.getByLabel('Gjenta ny pinkode').fill('482916')
+    await page.getByRole('button', { name: 'Bytt pinkode' }).click()
+    await page.getByText('De to nye kodene er ikke like.').waitFor()
+    await page.getByLabel('Gjenta ny pinkode').fill('482915')
+    await page.getByRole('button', { name: 'Bytt pinkode' }).click()
+    await page.getByText('Pinkoden er byttet.').waitFor()
+    assert.deepStrictEqual({ o: state.pinChange.old_pin, n: state.pinChange.new_pin }, { o: '123456', n: '482915' })
+    assert.strictEqual(await page.getByLabel('Nåværende pinkode').inputValue(), '', 'felt tømt etter bytte')
+    assert.ok(!(await page.content()).includes('482915'), 'ny pin i DOM etter bytte')
+    await shot(page, '10-bytt-pin')
     await page.getByRole('button', { name: 'Logg ut' }).click()
     await page.waitForURL('**/login')
-    ok('profil: oppdater navn/anonym og logg ut')
+    ok('profil: oppdater navn/anonym, bytt pinkode (feil/svak/ulik/ok) og logg ut')
     await ctx.close()
   }
 

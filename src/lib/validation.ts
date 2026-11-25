@@ -10,6 +10,13 @@ export function normalizePin(raw: string): string {
 export function isValidPin(pin: string): boolean {
   return /^\d{6}$/.test(pin)
 }
+/** Samme regel som backend: samme siffer (111111) og rene rekker (123456, 654321) er for lette å gjette. */
+export function isWeakPin(pin: string): boolean {
+  if (!/^\d{6}$/.test(pin)) return false
+  if (/^(\d)\1{5}$/.test(pin)) return true
+  const d = [...pin].map(Number)
+  return d.every((v, i) => i === 0 || v === d[i - 1] + 1) || d.every((v, i) => i === 0 || v === d[i - 1] - 1)
+}
 export function validateDisplayName(name: string): string | null {
   const t = name.trim()
   if (t.length < 2) return 'Navnet må ha minst 2 tegn.'
