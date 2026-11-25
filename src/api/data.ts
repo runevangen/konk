@@ -141,3 +141,33 @@ export async function listAllFeedback(competitionId: Id) {
 export async function setFeedbackHidden(id: Id, hidden: boolean) {
   check(await supabase.from('konk_feedback').update({ hidden }).eq('id', id))
 }
+
+// ---- admin: slett svar ----
+export interface AdminEntry { id: Id; item_id: Id; user_id: Id; score: number | null; guess_option_id: Id | null; comment: string | null; hidden: boolean }
+export async function listCompetitionEntries(itemIds: Id[]) {
+  if (!itemIds.length) return [] as AdminEntry[]
+  return check(
+    await supabase.from('konk_entries').select('id,item_id,user_id,score,guess_option_id,comment,hidden').in('item_id', itemIds),
+  ) as AdminEntry[]
+}
+/** Sletter ett svar. Kaster hvis ingenting ble slettet (f.eks. manglende tilgang). */
+export async function deleteEntry(id: Id) {
+  const r = await supabase.from('konk_entries').delete().eq('id', id).select('id')
+  const rows = check(r) as { id: Id }[]
+  if (!rows.length) throw new ApiError('not_deleted', 403, 'Svaret ble ikke slettet (mangler tilgang).')
+}
+/** Sletter alle svar og tilbakemeldinger fra én bruker i én konkurranse. Returnerer antall slettede svar. */
+export async function deleteUserAnswers(userId: Id, competitionId: Id, itemIds: Id[]) {
+  const fb = await supabase.from('konk_feedback').delete().eq('user_id', userId).eq('competition_id', competitionId)
+  check(fb)
+  if (!itemIds.length) return 0
+  const r = await supabase.from('konk_entries').delete().eq('user_id', userId).in('item_id', itemIds).select('id')
+  return (check(r) as { id: Id }[]).length
+}
+/** Nullstiller en konkurranse: sletter ALLE svar og tilbakemeldinger. Returnerer antall slettede svar. */
+export async function deleteAllAnswers(competitionId: Id, itemIds: Id[]) {
+  check(await supabase.from('konk_feedback').delete().eq('competition_id', competitionId))
+  if (!itemIds.length) return 0
+  const r = await supabase.from('konk_entries').delete().in('item_id', itemIds).select('id')
+  return (check(r) as { id: Id }[]).length
+}

@@ -20,6 +20,13 @@ function newPin(): string {
   return String(a[0] % 1000000).padStart(6, "0");
 }
 
+/** Avviser åpenbart gjettbare koder: samme siffer (111111) og rene rekker (123456, 654321). */
+function isWeakPin(pin: string): boolean {
+  if (/^(\d)\1{5}$/.test(pin)) return true;
+  const d = [...pin].map(Number);
+  return d.every((v, i) => i === 0 || v === d[i - 1] + 1) || d.every((v, i) => i === 0 || v === d[i - 1] - 1);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -49,5 +56,29 @@ Deno.serve(async (req) => {
     if (!error) return json({ pin });
     return json({ error: "reset_failed" }, 500);
   }
+  if (body.action === "set_pin") {
+    const user_id = typeof body.user_id === "string" ? body.user_id : "";
+    const pin = typeof body.pin === "string" ? body.pin.trim() : "";
+    if (!/^[0-9a-f-]{36}$/i.test(user_id)) return json({ error: "invalid_user_id" }, 400);
+    if (!/^\d{6}$/.test(pin) || isWeakPin(pin)) return json({ error: "weak_pin" }, 400);
+    const { data: target } = await admin.from("konk_profiles").select("id").eq("id", user_id).maybeSingle();
+    if (!target) return json({ error: "not_found" }, 404);
+    const { error } = await admin.from("konk_profiles").update({ pin_hash: await hmac(secret, `${user_id}:${pin}`) }).eq("id", user_id);
+    if (error) return json({ error: "update_failed" }, 500);
+    return json({ ok: true });
+  }
+
+  if (body.action === "delete_user") {
+    const user_id = typeof body.user_id === "string" ? body.user_id : "";
+    if (!/^[0-9a-f-]{36}$/i.test(user_id)) return json({ error: "invalid_user_id" }, 400);
+    if (user_id === au.user.id) return json({ error: "cannot_delete_self" }, 400);
+    const { data: target } = await admin.from("konk_profiles").select("id").eq("id", user_id).maybeSingle();
+    if (!target) return json({ error: "not_found" }, 404);
+    // Sletter auth-brukeren; profil, svar og tilbakemeldinger følger med (on delete cascade).
+    const { error } = await admin.auth.admin.deleteUser(user_id);
+    if (error) return json({ error: "delete_failed" }, 500);
+    return json({ ok: true });
+  }
+
   return json({ error: "unknown_action" }, 400);
 });

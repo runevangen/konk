@@ -1,15 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
-  addOption, deleteItem, deleteOption, listAllFeedback, listAnswers, listCommentEntries, listCompetitions, listItems, listOffices,
+  addOption, deleteAllAnswers, deleteEntry, deleteItem, deleteUserAnswers, listCompetitionEntries, deleteOption, listAllFeedback, listAnswers, listCommentEntries, listCompetitions, listItems, listOffices,
   listOptions, listProfiles, saveCompetition, saveItem, setAnswer, setEntryHidden, setFeedbackHidden,
 } from '../api/data'
-import { adminResetPin, errorMessage } from '../api/functions'
+import { adminDeleteUser, adminResetPin, adminSetPin, errorMessage } from '../api/functions'
+import { useAuth } from '../auth'
 import type { Competition, CompetitionStatus, GuessOption, Id, Item, Profile } from '../api/types'
 import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
-import { validateSlug } from '../lib/validation'
+import { isValidPin, isWeakPin, normalizePin, validateSlug } from '../lib/validation'
 
-const TABS = ['Konkurranser', 'Glass og fasit', 'Gjetteliste', 'Brukere', 'Moderering'] as const
+const TABS = ['Konkurranser', 'Glass og fasit', 'Gjetteliste', 'Brukere', 'Svar', 'Moderering'] as const
 type Tab = (typeof TABS)[number]
 
 export default function Admin() {
@@ -37,6 +38,7 @@ export default function Admin() {
       {tab === 'Glass og fasit' && comp && <ItemsTab comp={comp} />}
       {tab === 'Gjetteliste' && comp && <OptionsTab comp={comp} />}
       {tab === 'Brukere' && <UsersTab />}
+      {tab === 'Svar' && comp && <AnswersTab comp={comp} />}
       {tab === 'Moderering' && comp && <ModerationTab comp={comp} />}
     </>
   )
@@ -182,20 +184,41 @@ function OptionsTab({ comp }: { comp: Competition }) {
 
 // ---------- Brukere ----------
 function UsersTab() {
+  const { session } = useAuth()
+  const selfId = session?.user.id
   const users = useAsync(async () => ({ profiles: await listProfiles(), offices: await listOffices() }), [])
   const [reset, setReset] = useState<{ user: Profile; pin: string } | null>(null)
+  const [editing, setEditing] = useState<Id | null>(null)
+  const [newPin, setNewPin] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<Id | null>(null)
+  const [q, setQ] = useState('')
   const { err, run } = useAction()
   if (users.loading && !users.data) return <Loading />
   async function doReset(p: Profile) {
     if (!confirm(`Nullstille pinkoden til ${p.display_name}? Den gamle slutter å virke.`)) return
-    setBusyId(p.id)
-    await run(async () => { const { pin } = await adminResetPin(p.id); setReset({ user: p, pin }) })
+    setBusyId(p.id); setMsg(null)
+    await run(async () => { const { pin } = await adminResetPin(p.id); setReset({ user: p, pin }); setEditing(null) })
     setBusyId(null)
   }
+  async function doSetPin(p: Profile) {
+    if (!isValidPin(newPin)) { setMsg('Pinkoden må ha 6 siffer.'); return }
+    if (isWeakPin(newPin)) { setMsg('Velg en kode som er vanskeligere å gjette (ikke 111111 eller 123456).'); return }
+    setBusyId(p.id); setMsg(null)
+    await run(async () => { await adminSetPin(p.id, newPin); setMsg(`Ny pinkode er satt for ${p.display_name}. Gi koden videre til brukeren.`); setEditing(null); setNewPin('') })
+    setBusyId(null)
+  }
+  async function doDelete(p: Profile) {
+    if (!confirm(`Slette ${p.display_name}? Brukeren, alle svar og alle tilbakemeldinger fra brukeren slettes. Dette kan ikke angres.`)) return
+    setBusyId(p.id); setMsg(null)
+    await run(async () => { await adminDeleteUser(p.id); setMsg(`${p.display_name} er slettet.`); setEditing(null); await users.reload() })
+    setBusyId(null)
+  }
+  const list = (users.data?.profiles ?? []).filter((p) => p.display_name.toLowerCase().includes(q.trim().toLowerCase()))
   return (
     <>
       {err && <div className="on-bg-error" role="alert">{err}</div>}
+      {msg && <div className="card-alt" role="status">{msg}</div>}
       {reset && (
         <div className="card" role="alert">
           <h2>Ny pinkode til {reset.user.display_name}</h2>
@@ -206,13 +229,37 @@ function UsersTab() {
       )}
       <div className="card">
         <h2>Brukere ({users.data?.profiles.length ?? 0})</h2>
-        {users.data?.profiles.map((p) => (
-          <div key={p.id} className="row between" style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-            <span><strong>{p.display_name}</strong>{p.is_admin ? ' (admin)' : ''}<br />
-              <span className="soft small">{users.data!.offices.find((o) => o.id === p.office_id)?.name ?? '–'}{p.anonymous ? ' · anonym' : ''}</span></span>
-            <button className="btn ghost small" disabled={busyId === p.id} onClick={() => doReset(p)}>Reset pinkode</button>
-          </div>
-        ))}
+        <label className="field">Søk
+          <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Søk på navn" autoComplete="off" />
+        </label>
+        {list.length === 0 && <p className="soft">Ingen brukere funnet.</p>}
+        {list.map((p) => {
+          const isSelf = p.id === selfId
+          return (
+            <div key={p.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div className="row between" style={{ alignItems: 'flex-start' }}>
+                <span><strong>{p.display_name}</strong>{p.is_admin ? ' (admin)' : ''}{isSelf ? ' (deg)' : ''}<br />
+                  <span className="soft small">{users.data!.offices.find((o) => o.id === p.office_id)?.name ?? '–'}{p.anonymous ? ' · anonym' : ''}</span></span>
+                <span className="row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6 }}>
+                  <button className="btn ghost small" disabled={busyId === p.id} onClick={() => { setEditing(editing === p.id ? null : p.id); setNewPin(''); setMsg(null) }} aria-expanded={editing === p.id}>Sett pinkode</button>
+                  <button className="btn ghost small" disabled={busyId === p.id} onClick={() => doReset(p)}>Ny tilfeldig</button>
+                  {!isSelf && <button className="btn small" disabled={busyId === p.id} onClick={() => doDelete(p)}>Slett</button>}
+                </span>
+              </div>
+              {editing === p.id && (
+                <form style={{ marginTop: 10 }} onSubmit={(e) => { e.preventDefault(); void doSetPin(p) }} noValidate>
+                  <label className="field" htmlFor={`pin-${p.id}`}>Ny pinkode til {p.display_name} (6 siffer)</label>
+                  <input id={`pin-${p.id}`} className="pin" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" maxLength={9}
+                    value={newPin} onChange={(e) => setNewPin(normalizePin(e.target.value))} />
+                  <div className="row" style={{ marginTop: 8 }}>
+                    <button className="btn small" disabled={busyId === p.id || newPin.length !== 6}>Lagre pinkode</button>
+                    <button type="button" className="btn ghost small" onClick={() => { setEditing(null); setNewPin('') }}>Avbryt</button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )
+        })}
       </div>
     </>
   )
@@ -257,6 +304,82 @@ function ModerationTab({ comp }: { comp: Competition }) {
             <button className="btn ghost small" onClick={() => run(async () => { await setFeedbackHidden(f.id, !f.hidden); await d.reload() })}>{f.hidden ? 'Vis' : 'Skjul'}</button>
           </div>
         ))}
+      </div>
+    </>
+  )
+}
+
+// ---------- Svar (slett) ----------
+function AnswersTab({ comp }: { comp: Competition }) {
+  const d = useAsync(async () => {
+    const [items, options, profiles, offices] = await Promise.all([listItems(comp.id), listOptions(comp.id), listProfiles(), listOffices()])
+    const entries = await listCompetitionEntries(items.map((i) => i.id))
+    return { items, options, profiles, offices, entries }
+  }, [comp.id])
+  const [open, setOpen] = useState<Id | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [confirmAll, setConfirmAll] = useState('')
+  const { err, run } = useAction()
+  if (d.loading && !d.data) return <Loading />
+  if (!d.data) return null
+  const { items, options, profiles, offices, entries } = d.data
+  const itemLabel = (id: Id) => items.find((i) => i.id === id)?.label ?? '?'
+  const optionLabel = (id: Id | null) => (id ? options.find((o) => o.id === id)?.label ?? '?' : '–')
+  const byUser = new Map<Id, typeof entries>()
+  for (const e of entries) byUser.set(e.user_id, [...(byUser.get(e.user_id) ?? []), e])
+  const users = [...byUser.keys()].map((id) => profiles.find((p) => p.id === id) ?? ({ id, display_name: 'ukjent bruker', office_id: null, anonymous: false, is_admin: false } as Profile))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, 'nb'))
+  const itemIds = items.map((i) => i.id)
+
+  async function delOne(e: (typeof entries)[number], who: string) {
+    if (!confirm(`Slette svaret fra ${who} på ${itemLabel(e.item_id)}? Dette kan ikke angres.`)) return
+    await run(async () => { await deleteEntry(e.id); setMsg('Svaret er slettet.'); await d.reload() })
+  }
+  async function delUser(p: Profile) {
+    if (!confirm(`Slette ALLE svar og tilbakemeldinger fra ${p.display_name} i ${comp.title}? Dette kan ikke angres.`)) return
+    await run(async () => { const n = await deleteUserAnswers(p.id, comp.id, itemIds); setMsg(`Slettet ${n} svar fra ${p.display_name}.`); setOpen(null); await d.reload() })
+  }
+  async function delAll() {
+    await run(async () => { const n = await deleteAllAnswers(comp.id, itemIds); setMsg(`Nullstilt: slettet ${n} svar og alle tilbakemeldinger.`); setConfirmAll(''); setOpen(null); await d.reload() })
+  }
+
+  return (
+    <>
+      {err && <div className="on-bg-error" role="alert">{err}</div>}
+      {msg && <div className="card-alt" role="status">{msg}</div>}
+      <div className="card">
+        <h2>Svar i {comp.title} ({entries.length})</h2>
+        <p className="soft small">Du kan slette enkeltsvar, alle svar fra én bruker, eller nullstille hele konkurransen. Sletting kan ikke angres, og snitt og tavle oppdateres med en gang.</p>
+        {users.length === 0 && <p className="soft">Ingen har svart ennå.</p>}
+        {users.map((p) => {
+          const list = (byUser.get(p.id) ?? []).slice().sort((a, b) => (items.find((i) => i.id === a.item_id)?.position ?? 0) - (items.find((i) => i.id === b.item_id)?.position ?? 0))
+          const isOpen = open === p.id
+          return (
+            <div key={p.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <div className="row between">
+                <button className="btn ghost small" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : p.id)} style={{ textAlign: 'left' }}>
+                  <strong>{p.display_name}</strong> · {offices.find((o) => o.id === p.office_id)?.name ?? '–'}{p.anonymous ? ' · anonym' : ''} · {list.length} svar {isOpen ? '▲' : '▼'}
+                </button>
+                <button className="btn small" onClick={() => delUser(p)}>Slett alle</button>
+              </div>
+              {isOpen && list.map((e) => (
+                <div key={e.id} className="row between" style={{ padding: '6px 0 6px 12px', alignItems: 'flex-start' }}>
+                  <div className="small" style={{ flex: 1, minWidth: 0 }}>
+                    <strong>{itemLabel(e.item_id)}</strong>: score {e.score ?? '–'}, gjettet {optionLabel(e.guess_option_id)}
+                    {e.comment ? <div className="soft">«{e.comment}»</div> : null}
+                  </div>
+                  <button className="btn ghost small" onClick={() => delOne(e, p.display_name)}>Slett</button>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+      <div className="card">
+        <h2>Nullstill konkurransen</h2>
+        <p className="soft small">Sletter alle svar og alle tilbakemeldinger i {comp.title}. Glass, fasit, gjetteliste og brukere beholdes. Nyttig etter at du har testet. Skriv <strong>SLETT</strong> for å bekrefte.</p>
+        <input type="text" aria-label="Skriv SLETT for å bekrefte" value={confirmAll} onChange={(e) => setConfirmAll(e.target.value)} placeholder="SLETT" />
+        <button className="btn" style={{ marginTop: 10 }} disabled={confirmAll !== 'SLETT'} onClick={delAll}>Slett alle svar</button>
       </div>
     </>
   )

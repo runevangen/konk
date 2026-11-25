@@ -4,3 +4,6 @@ dist
 .env.local
 *.tsbuildinfo
 .netlify
+
+# e2e genererer skjermbilder ved hver kjøring; ikke versjonskontroller (gir flettekonflikter)
+docs/screenshots/
