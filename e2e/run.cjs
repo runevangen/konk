@@ -277,6 +277,51 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await ctx.close()
   }
 
+  // --- Robust valg: aldri to markerte tall/gjetninger, også ved raske trykk og hopping mellom glass ---
+  {
+    const state = freshState({ status: 'open' })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/k/julebrustest')
+    await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor()
+    const onScores = () => page.locator('.score-grid span.on').allInnerTexts()
+    const onGuess = () => page.locator('.option-list span.on').allInnerTexts()
+    const tap = (n) => page.locator(`.score-grid label:has(input[value="${n}"])`).click()
+    // raske trykk uten pauser: bare siste gjelder
+    for (const n of [1, 10, 3, 1, 10]) await tap(n)
+    assert.deepStrictEqual(await onScores(), ['10'])
+    // sett ulike verdier på alle glass, hopp frem og tilbake
+    const values = [1, 10, 4, 7, 2, 9]
+    for (let i = 0; i < 6; i++) {
+      await page.getByRole('navigation', { name: 'Velg glass' }).getByRole('button', { name: new RegExp('^Glass ' + (i + 1)) }).click()
+      await page.getByRole('heading', { name: new RegExp('Glass ' + (i + 1) + ' av 6') }).waitFor()
+      await tap(values[i])
+      await page.getByLabel('Julebrus A').check().catch(() => page.getByText('Julebrus A').click())
+      assert.deepStrictEqual(await onScores(), [String(values[i])], `glass ${i + 1}: feil markering rett etter valg`)
+    }
+    for (const i of [5, 0, 3, 1, 4, 2, 5, 0]) {
+      await page.getByRole('navigation', { name: 'Velg glass' }).getByRole('button', { name: new RegExp('^Glass ' + (i + 1)) }).click()
+      await page.getByRole('heading', { name: new RegExp('Glass ' + (i + 1) + ' av 6') }).waitFor()
+      assert.deepStrictEqual(await onScores(), [String(values[i])], `glass ${i + 1}: feil/flere markerte tall ved hopping`)
+      assert.strictEqual((await onGuess()).length, 1, `glass ${i + 1}: nøyaktig én gjetting skal være markert`)
+      assert.strictEqual(await page.locator('.score-grid input:checked').count(), 1, `glass ${i + 1}: nøyaktig ett avkrysset tall`)
+    }
+    // forrige/neste-knapper
+    await page.getByRole('button', { name: 'Neste →' }).click()
+    await page.getByRole('button', { name: 'Neste →' }).click()
+    await page.getByRole('button', { name: '← Forrige' }).click()
+    const cur = Number((await page.getByRole('heading', { level: 2 }).first().innerText()).match(/Glass (\d) av/)[1])
+    assert.deepStrictEqual(await onScores(), [String(values[cur - 1])])
+    // og etter oppdatering av siden
+    await page.reload()
+    await page.getByRole('heading', { name: /Glass \d av 6/ }).waitFor()
+    const cur2 = Number((await page.getByRole('heading', { level: 2 }).first().innerText()).match(/Glass (\d) av/)[1])
+    assert.deepStrictEqual(await onScores(), [String(values[cur2 - 1])])
+    ok('stepper: aldri to markerte tall/gjetninger (raske trykk, hopping, forrige/neste og reload)')
+    await ctx.close()
+  }
+
   // --- Låst + resultat ikke klart ---
   {
     const state = freshState({ status: 'closed', entries: { i1: { id: 'e1', user_id: UID, item_id: 'i1', score: 7, guess_option_id: 'o1', comment: 'ok' } } })

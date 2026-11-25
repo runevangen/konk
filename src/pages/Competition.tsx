@@ -126,15 +126,15 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
         </div>
       </nav>
 
-      <section className="card" style={{ marginTop: 16 }} aria-labelledby="glass-h">
+      <section key={item.id} className="card" style={{ marginTop: 16 }} aria-labelledby="glass-h">
         <h2 id="glass-h">Glass {idx + 1} av {items.length}{item.label && item.label !== String(idx + 1) ? ` – ${item.label}` : ''}</h2>
 
         <fieldset className="score-grid" disabled={locked} style={{ display: 'grid' }}>
           <legend className="sr-only">Score fra {SCORE_MIN} til {SCORE_MAX}</legend>
           {Array.from({ length: SCORE_MAX }, (_, k) => k + 1).map((n) => (
-            <label key={n}>
+            <label key={`${item.id}-${n}`}>
               <input type="radio" name={`score-${item.id}`} value={n} checked={d.score === n} onChange={() => update(item.id, { score: n }, true)} />
-              <span>{n}</span>
+              <span className={d.score === n ? 'on' : ''} data-on={d.score === n ? '1' : '0'}>{n}</span>
             </label>
           ))}
         </fieldset>
@@ -144,9 +144,9 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
           <fieldset disabled={locked}>
             <legend>Hva tror du det er?</legend>
             <div className="option-list">
-              <label><input type="radio" name={`guess-${item.id}`} checked={d.guess === null} onChange={() => update(item.id, { guess: null }, true)} /><span>Vet ikke</span></label>
+              <label key={`${item.id}-none`}><input type="radio" name={`guess-${item.id}`} checked={d.guess === null} onChange={() => update(item.id, { guess: null }, true)} /><span className={d.guess === null ? 'on' : ''}>Vet ikke</span></label>
               {options.map((o) => (
-                <label key={o.id}><input type="radio" name={`guess-${item.id}`} checked={d.guess === o.id} onChange={() => update(item.id, { guess: o.id }, true)} /><span>{o.label}</span></label>
+                <label key={`${item.id}-${o.id}`}><input type="radio" name={`guess-${item.id}`} checked={d.guess === o.id} onChange={() => update(item.id, { guess: o.id }, true)} /><span className={d.guess === o.id ? 'on' : ''}>{o.label}</span></label>
               ))}
             </div>
           </fieldset>
