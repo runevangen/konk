@@ -47,15 +47,18 @@ export interface MyFeedback {
   id: Id; competition_id: Id; item_id: Id | null; target: FeedbackTarget; emoji: string | null; comment: string | null
 }
 
-export interface LiveOffice { office_id: Id; name: string; avg_score: number | null; n_entries: number; participants: number }
-export interface LiveItemOffice { office_id: Id; name: string; avg_score: number | null; n: number }
-export interface LiveItem { item_id: Id; position: number; label: string; brus: string | null; avg_score: number | null; n: number; by_office: LiveItemOffice[] }
+export interface LiveOffice { office_id: Id; name: string; avg_score: number | null; n_entries: number; participants: number; hits: number; guesses: number; hit_rate: number | null }
+export interface LiveItemOffice { office_id: Id; name: string; avg_score: number | null; n: number; hits: number; guesses: number; hit_rate: number | null }
+export interface LiveItem { item_id: Id; position: number; label: string; brus: string | null; avg_score: number | null; n: number; hits: number; guesses: number; hit_rate: number | null; by_office: LiveItemOffice[] }
+export interface LivePerson { name: string; office_id: Id; office_name: string; hits: number; guesses: number; answered: number }
 export interface LiveBoard {
   status: CompetitionStatus
   min_n: number
   names: boolean
   updated_at: string
-  overall: { n_entries: number; participants: number; avg: number | null }
+  overall: { n_entries: number; participants: number; avg: number | null; hits: number; guesses: number; hit_rate: number | null }
   offices: LiveOffice[]
   items: LiveItem[]
+  people: LivePerson[]
+  people_min: number
 }
