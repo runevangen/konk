@@ -9,13 +9,13 @@ import { ApiError } from '../api/client'
 const POLL_MS = 5000
 type View = 'all' | Id
 
-interface Row { item_id: Id; position: number; label: string; avg: number | null; n: number }
+interface Row { item_id: Id; position: number; label: string; brus: string | null; avg: number | null; n: number }
 
 export function rowsFor(board: LiveBoard, view: View): Row[] {
   return board.items.map((i) => {
-    if (view === 'all') return { item_id: i.item_id, position: i.position, label: i.label, avg: i.avg_score, n: i.n }
+    if (view === 'all') return { item_id: i.item_id, position: i.position, label: i.label, brus: i.brus, avg: i.avg_score, n: i.n }
     const o = i.by_office.find((x) => String(x.office_id) === String(view))
-    return { item_id: i.item_id, position: i.position, label: i.label, avg: o?.avg_score ?? null, n: o?.n ?? 0 }
+    return { item_id: i.item_id, position: i.position, label: i.label, brus: i.brus, avg: o?.avg_score ?? null, n: o?.n ?? 0 }
   })
 }
 
@@ -108,16 +108,16 @@ export default function Tavle() {
         {entries === 0 && <p>Ingen har stemt ennå. Tavlen fylles ut etter hvert som deltakerne gir poeng.</p>}
         {ranked.map(({ rank, row }) => (
           <div key={row.item_id} className={`bar-row ${changed.has(row.item_id) ? 'pulse' : ''}`}>
-            <span><span className={`rank ${rank === 1 && row.avg != null ? 'r1' : ''}`} style={{ marginRight: 8 }}>{row.avg != null ? rank : '·'}</span><strong>Plass {rank}</strong></span>
+            <span><span className={`rank ${rank === 1 && row.avg != null ? 'r1' : ''}`} style={{ marginRight: 8 }}>{row.avg != null ? rank : '·'}</span><strong>{row.brus ?? `Plass ${rank}`}</strong></span>
             <strong>{row.avg != null ? formatScore(row.avg, 2) : <span className="soft small">venter</span>}</strong>
-            <div className="bar" role="img" aria-label={`Plass ${rank}: ${row.avg != null ? formatScore(row.avg, 2) : 'ikke nok svar'}`}>
+            <div className="bar" role="img" aria-label={`${row.brus ?? `Plass ${rank}`}: ${row.avg != null ? formatScore(row.avg, 2) : 'ikke nok svar'}`}>
               <i style={{ width: `${scoreBarWidth(row.avg)}%` }} />
             </div>
             <span className="soft small" style={{ gridColumn: '1 / -1' }}>{pluralize(row.n, 'svar', 'svar')}</span>
           </div>
         ))}
         <p className="soft small" style={{ margin: '10px 0 0' }}>
-          Tavlen viser rangeringen uten å si hvilket glass som er hvilket. Snitt vises når minst {board.min_n} har svart, slik at ingen enkeltpersoners poeng avsløres.
+          {board.names ? 'Rangeringen viser hvilken brus som ligger hvor. ' : 'Tavlen viser rangeringen uten å si hvilket glass som er hvilket. '}Snitt vises når minst {board.min_n} har svart, slik at ingen enkeltpersoners poeng avsløres.
         </p>
       </div>
 
