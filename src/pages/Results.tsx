@@ -163,13 +163,13 @@ function ItemResult({ rank, item, comments, fb, mine, onReact }: {
     <details className="rank-item" style={{ color: 'var(--ink)' }}>
       <summary>
         <span className={`rank ${rank === 1 ? 'r1' : ''}`} aria-label={`Plass ${rank}`}>{rank}</span>
-        <span className="sum-main"><strong>{item.label || `Glass ${item.position}`}</strong><br />
-          <span className="soft small">{item.correct_label ? `Fasit: ${item.correct_label}` : 'Fasit ikke satt'} · {formatPercent(item.hit_rate)} gjettet riktig</span></span>
+        <span className="sum-main"><strong>Glass {item.position}{item.correct_label ? ` – ${item.correct_label}` : ''}</strong><br />
+          <span className="soft small">Plass {rank} · {item.correct_label ? 'Fasit satt' : 'Fasit ikke satt'} · {formatPercent(item.hit_rate)} gjettet riktig</span></span>
         <span className="sum-score">{formatScore(item.avg_score)}</span>
       </summary>
       <div className="inner">
         <div className="bar red" aria-hidden="true"><i style={{ width: `${scoreBarWidth(item.avg_score)}%` }} /></div>
-        <p className="soft small" style={{ marginTop: 6 }}>Glass {item.position} · {pluralize(item.n, 'vurdering', 'vurderinger')}</p>
+        <p className="soft small" style={{ marginTop: 6 }}>Glass {item.position}{item.correct_label ? `: fasit ${item.correct_label}` : ''} · {pluralize(item.n, 'vurdering', 'vurderinger')}</p>
         {item.by_office.length > 0 && (
           <table className="t" aria-label="Snitt per kontor"><tbody>
             {item.by_office.map((o) => <tr key={o.office_id}><td>{o.name}</td><td><strong>{formatScore(o.avg_score)}</strong></td><td className="soft small">{o.n} vurd.</td></tr>)}

@@ -318,10 +318,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('tab', { name: 'Samlet' }).waitFor()
     await page.getByRole('tab', { name: 'Oslo' }).waitFor()
     await page.getByRole('tab', { name: 'Stavanger' }).waitFor()
-    // rangering uten glassnavn: plass 1 = 8,25, plass 2 = 6,50
+    // rangering: Glass 2 (8,25) er plass 1, Glass 1 (6,50) er plass 2
     const first = await page.locator('.bar-row strong').first().innerText()
-    assert.strictEqual(first, 'Plass 1')
-    assert.ok(!(await page.locator('main, #root').first().innerText()).includes('Glass 2'), 'glassnavn skal ikke vises på tavlen')
+    assert.strictEqual(first, 'Glass 2')
+    await page.getByText('Plass 1').first().waitFor()
     assert.strictEqual(await page.locator('.bar-row strong').nth(1).innerText(), '8,25')
     await page.getByText('8,25').first().waitFor()
     await shot(page, '08-live-tavle-samlet')
@@ -331,6 +331,15 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('tab', { name: 'Oslo' }).click()
     await page.getByText('8,50').waitFor()
     await shot(page, '09-live-tavle-oslo')
+    // rekkefølgen følger scoren i alle faner: snitt aldri stigende nedover, og uten snitt til slutt
+    for (const tab of ['Samlet', 'Oslo', 'Stavanger']) {
+      await page.getByRole('tab', { name: tab }).click()
+      const avgs = await page.locator('[data-testid="tavle-row"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-avg')))
+      const nums = avgs.filter((a) => a !== '').map(Number)
+      assert.deepStrictEqual(nums, [...nums].sort((a, b) => b - a), `rekkefølge følger ikke score i fane ${tab}: ${avgs}`)
+      const firstEmpty = avgs.indexOf('')
+      if (firstEmpty >= 0) assert.ok(avgs.slice(firstEmpty).every((a) => a === ''), `rader uten snitt skal komme sist i ${tab}`)
+    }
     ok('live tavle: samlet og per kontor, rangering, skjuler snitt under minimum, ingen fasit')
     // oppdateres automatisk (polling)
     await page.getByRole('tab', { name: 'Samlet' }).click()
@@ -348,9 +357,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
     await page.goto(BASE + '/k/julebrustest/tavle')
     await page.getByRole('heading', { name: 'Live tavle' }).waitFor()
-    assert.strictEqual(await page.locator('.bar-row strong').first().innerText(), 'Askim')
-    await page.getByText('Ringnes').first().waitFor()
-    assert.ok(!(await page.locator('main, #root').first().innerText()).includes('Plass 1'), 'plassnavn skal ikke vises når brusnavn finnes')
+    assert.strictEqual(await page.locator('.bar-row strong').first().innerText(), 'Glass 2 – Askim')
+    await page.getByText('Glass 1 – Ringnes').first().waitFor()
     await shot(page, '13-live-tavle-brusnavn')
     ok('live tavle: viser brusnavn når admin har slått det på')
     await ctx.close()
