@@ -3,11 +3,12 @@ import {
   addOption, deleteItem, deleteOption, listAllFeedback, listAnswers, listCommentEntries, listCompetitions, listItems, listOffices,
   listOptions, listProfiles, saveCompetition, saveItem, setAnswer, setEntryHidden, setFeedbackHidden,
 } from '../api/data'
-import { adminResetPin, errorMessage } from '../api/functions'
+import { adminDeleteUser, adminResetPin, adminSetPin, errorMessage } from '../api/functions'
+import { useAuth } from '../auth'
 import type { Competition, CompetitionStatus, GuessOption, Id, Item, Profile } from '../api/types'
 import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
-import { validateSlug } from '../lib/validation'
+import { isValidPin, isWeakPin, normalizePin, validateSlug } from '../lib/validation'
 
 const TABS = ['Konkurranser', 'Glass og fasit', 'Gjetteliste', 'Brukere', 'Moderering'] as const
 type Tab = (typeof TABS)[number]
@@ -176,20 +177,41 @@ function OptionsTab({ comp }: { comp: Competition }) {
 
 // ---------- Brukere ----------
 function UsersTab() {
+  const { session } = useAuth()
+  const selfId = session?.user.id
   const users = useAsync(async () => ({ profiles: await listProfiles(), offices: await listOffices() }), [])
   const [reset, setReset] = useState<{ user: Profile; pin: string } | null>(null)
+  const [editing, setEditing] = useState<Id | null>(null)
+  const [newPin, setNewPin] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<Id | null>(null)
+  const [q, setQ] = useState('')
   const { err, run } = useAction()
   if (users.loading && !users.data) return <Loading />
   async function doReset(p: Profile) {
     if (!confirm(`Nullstille pinkoden til ${p.display_name}? Den gamle slutter å virke.`)) return
-    setBusyId(p.id)
-    await run(async () => { const { pin } = await adminResetPin(p.id); setReset({ user: p, pin }) })
+    setBusyId(p.id); setMsg(null)
+    await run(async () => { const { pin } = await adminResetPin(p.id); setReset({ user: p, pin }); setEditing(null) })
     setBusyId(null)
   }
+  async function doSetPin(p: Profile) {
+    if (!isValidPin(newPin)) { setMsg('Pinkoden må ha 6 siffer.'); return }
+    if (isWeakPin(newPin)) { setMsg('Velg en kode som er vanskeligere å gjette (ikke 111111 eller 123456).'); return }
+    setBusyId(p.id); setMsg(null)
+    await run(async () => { await adminSetPin(p.id, newPin); setMsg(`Ny pinkode er satt for ${p.display_name}. Gi koden videre til brukeren.`); setEditing(null); setNewPin('') })
+    setBusyId(null)
+  }
+  async function doDelete(p: Profile) {
+    if (!confirm(`Slette ${p.display_name}? Brukeren, alle svar og alle tilbakemeldinger fra brukeren slettes. Dette kan ikke angres.`)) return
+    setBusyId(p.id); setMsg(null)
+    await run(async () => { await adminDeleteUser(p.id); setMsg(`${p.display_name} er slettet.`); setEditing(null); await users.reload() })
+    setBusyId(null)
+  }
+  const list = (users.data?.profiles ?? []).filter((p) => p.display_name.toLowerCase().includes(q.trim().toLowerCase()))
   return (
     <>
       {err && <div className="on-bg-error" role="alert">{err}</div>}
+      {msg && <div className="card-alt" role="status">{msg}</div>}
       {reset && (
         <div className="card" role="alert">
           <h2>Ny pinkode til {reset.user.display_name}</h2>
@@ -200,13 +222,37 @@ function UsersTab() {
       )}
       <div className="card">
         <h2>Brukere ({users.data?.profiles.length ?? 0})</h2>
-        {users.data?.profiles.map((p) => (
-          <div key={p.id} className="row between" style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-            <span><strong>{p.display_name}</strong>{p.is_admin ? ' (admin)' : ''}<br />
-              <span className="soft small">{users.data!.offices.find((o) => o.id === p.office_id)?.name ?? '–'}{p.anonymous ? ' · anonym' : ''}</span></span>
-            <button className="btn ghost small" disabled={busyId === p.id} onClick={() => doReset(p)}>Reset pinkode</button>
-          </div>
-        ))}
+        <label className="field">Søk
+          <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Søk på navn" autoComplete="off" />
+        </label>
+        {list.length === 0 && <p className="soft">Ingen brukere funnet.</p>}
+        {list.map((p) => {
+          const isSelf = p.id === selfId
+          return (
+            <div key={p.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div className="row between" style={{ alignItems: 'flex-start' }}>
+                <span><strong>{p.display_name}</strong>{p.is_admin ? ' (admin)' : ''}{isSelf ? ' (deg)' : ''}<br />
+                  <span className="soft small">{users.data!.offices.find((o) => o.id === p.office_id)?.name ?? '–'}{p.anonymous ? ' · anonym' : ''}</span></span>
+                <span className="row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6 }}>
+                  <button className="btn ghost small" disabled={busyId === p.id} onClick={() => { setEditing(editing === p.id ? null : p.id); setNewPin(''); setMsg(null) }} aria-expanded={editing === p.id}>Sett pinkode</button>
+                  <button className="btn ghost small" disabled={busyId === p.id} onClick={() => doReset(p)}>Ny tilfeldig</button>
+                  {!isSelf && <button className="btn small" disabled={busyId === p.id} onClick={() => doDelete(p)}>Slett</button>}
+                </span>
+              </div>
+              {editing === p.id && (
+                <form style={{ marginTop: 10 }} onSubmit={(e) => { e.preventDefault(); void doSetPin(p) }} noValidate>
+                  <label className="field" htmlFor={`pin-${p.id}`}>Ny pinkode til {p.display_name} (6 siffer)</label>
+                  <input id={`pin-${p.id}`} className="pin" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" maxLength={9}
+                    value={newPin} onChange={(e) => setNewPin(normalizePin(e.target.value))} />
+                  <div className="row" style={{ marginTop: 8 }}>
+                    <button className="btn small" disabled={busyId === p.id || newPin.length !== 6}>Lagre pinkode</button>
+                    <button type="button" className="btn ghost small" onClick={() => { setEditing(null); setNewPin('') }}>Avbryt</button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )
+        })}
       </div>
     </>
   )
