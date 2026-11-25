@@ -5,6 +5,7 @@ import { useAuth } from '../auth'
 import { isValidPin, normalizePin } from '../lib/validation'
 
 export default function Login() {
+  const [name, setName] = useState('')
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -17,10 +18,11 @@ export default function Login() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (!name.trim()) { setError('Skriv inn navnet ditt.'); return }
     if (!isValidPin(pin)) { setError('Pinkoden har 6 siffer.'); return }
     setBusy(true); setError(null)
     try {
-      const { session } = await login(pin)
+      const { session } = await login(name.trim(), pin)
       await applySession(session)
       nav(from, { replace: true })
     } catch (err) {
@@ -31,13 +33,16 @@ export default function Login() {
   return (
     <div className="card">
       <h1>Logg inn</h1>
-      <p className="soft">Skriv inn din personlige pinkode med 6 siffer.</p>
+      <p className="soft">Skriv inn navnet ditt og din personlige pinkode med 6 siffer.</p>
       <form onSubmit={submit} noValidate>
-        <label className="field" htmlFor="pin">Pinkode</label>
+        <label className="field" htmlFor="name">Navn</label>
+        <input id="name" type="text" autoComplete="username" maxLength={40} value={name}
+          onChange={(e) => setName(e.target.value)} autoFocus />
+        <label className="field" htmlFor="pin" style={{ marginTop: 12 }}>Pinkode</label>
         <input id="pin" className="pin" type="password" inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code"
-          maxLength={9} value={pin} onChange={(e) => setPin(normalizePin(e.target.value))} aria-describedby={error ? 'pin-err' : undefined} aria-invalid={!!error} autoFocus />
+          maxLength={9} value={pin} onChange={(e) => setPin(normalizePin(e.target.value))} aria-describedby={error ? 'pin-err' : undefined} aria-invalid={!!error} />
         {error && <p id="pin-err" className="error" role="alert">{error}</p>}
-        <button className="btn block" style={{ marginTop: 14 }} disabled={busy || pin.length !== 6}>{busy ? 'Logger inn …' : 'Logg inn'}</button>
+        <button className="btn block" style={{ marginTop: 14 }} disabled={busy || !name.trim() || pin.length !== 6}>{busy ? 'Logger inn …' : 'Logg inn'}</button>
       </form>
       <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '18px 0' }} />
       <p className="soft" style={{ marginBottom: 8 }}>Første gang her?</p>

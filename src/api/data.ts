@@ -18,7 +18,9 @@ export async function getProfile(userId: Id) {
   ) as Profile | null
 }
 export async function updateProfile(userId: Id, patch: { display_name: string; anonymous: boolean }) {
-  check(await supabase.from('konk_profiles').update(patch).eq('id', userId))
+  const r = await supabase.from('konk_profiles').update(patch).eq('id', userId)
+  if (r.error?.code === '23505') throw new ApiError('name_taken', 409)
+  check(r)
 }
 export async function listCompetitions(includeDraft = false) {
   let q = supabase.from('konk_competitions').select('id,slug,title,kind,status').order('title')

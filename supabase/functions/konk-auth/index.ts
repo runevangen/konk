@@ -51,25 +51,23 @@ Deno.serve(async (req) => {
     const { data: office } = await admin.from("konk_offices").select("id").eq("id", office_id).maybeSingle();
     if (!office) return json({ error: "invalid_office" }, 400);
 
+    const nameKey = display_name.toLowerCase();
+    const { data: taken } = await admin.from("konk_profiles").select("id").eq("name_key", nameKey).maybeSingle();
+    if (taken) return json({ error: "name_taken" }, 409);
+
     const userId = crypto.randomUUID();
     const { error: ce } = await admin.auth.admin.createUser({
       id: userId, email: `${userId}@konk.invalid`, password: await hmac(secret, userId), email_confirm: true,
     } as never);
     if (ce) return json({ error: "create_failed" }, 500);
 
-    let pin = "";
-    let ok = false;
-    for (let i = 0; i < 8 && !ok; i++) {
-      pin = newPin();
-      const { error } = await admin.from("konk_profiles").insert({
-        id: userId, display_name, office_id, anonymous, pin_hash: await hmac(secret, pin),
-      });
-      if (!error) ok = true;
-      else if (error.code !== "23505") break;
-    }
-    if (!ok) {
+    const pin = newPin();
+    const { error: ie } = await admin.from("konk_profiles").insert({
+      id: userId, display_name, office_id, anonymous, pin_hash: await hmac(secret, `${userId}:${pin}`),
+    });
+    if (ie) {
       await admin.auth.admin.deleteUser(userId);
-      return json({ error: "create_failed" }, 500);
+      return ie.code === "23505" ? json({ error: "name_taken" }, 409) : json({ error: "create_failed" }, 500);
     }
     const session = await signIn(userId);
     if (!session) return json({ error: "signin_failed" }, 500);
@@ -78,21 +76,27 @@ Deno.serve(async (req) => {
 
   if (body.action === "login") {
     const ip = (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown").trim();
-    const since = new Date(Date.now() - 60_000).toISOString();
-    const { data: recent, error: rateErr } = await admin.from("konk_login_attempts").select("id")
-      .eq("ip", ip).gte("created_at", since).limit(5);
-    if (rateErr) return json({ error: "rate_check_failed" }, 500);
-    if ((recent?.length ?? 0) >= 5) return json({ error: "too_many_attempts" }, 429);
-
+    const name = typeof body.display_name === "string" ? body.display_name.trim().toLowerCase().slice(0, 40) : "";
     const pin = typeof body.pin === "string" ? body.pin.trim() : "";
+    const since = new Date(Date.now() - 60_000).toISOString();
+
+    // maks 5 feil per minutt per IP, og maks 5 per minutt per navn
+    const { data: byIp, error: e1 } = await admin.from("konk_login_attempts").select("id")
+      .eq("ip", ip).gte("created_at", since).limit(5);
+    const { data: byName, error: e2 } = name
+      ? await admin.from("konk_login_attempts").select("id").eq("login_name", name).gte("created_at", since).limit(5)
+      : { data: [], error: null };
+    if (e1 || e2) return json({ error: "rate_check_failed" }, 500);
+    if ((byIp?.length ?? 0) >= 5 || (byName?.length ?? 0) >= 5) return json({ error: "too_many_attempts" }, 429);
+
     let userId: string | null = null;
-    if (/^\d{6}$/.test(pin)) {
-      const { data } = await admin.from("konk_profiles").select("id").eq("pin_hash", await hmac(secret, pin)).maybeSingle();
-      userId = data?.id ?? null;
+    if (name && /^\d{6}$/.test(pin)) {
+      const { data } = await admin.from("konk_profiles").select("id, pin_hash").eq("name_key", name).maybeSingle();
+      if (data && data.pin_hash && data.pin_hash === (await hmac(secret, `${data.id}:${pin}`))) userId = data.id;
     }
     const session = userId ? await signIn(userId) : null;
     if (!session) {
-      await admin.from("konk_login_attempts").insert({ ip });
+      await admin.from("konk_login_attempts").insert({ ip, login_name: name || null });
       await admin.from("konk_login_attempts").delete().lt("created_at", new Date(Date.now() - 86_400_000).toISOString());
       return json({ error: "invalid_pin" }, 401);
     }

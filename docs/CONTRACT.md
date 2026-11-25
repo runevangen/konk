@@ -19,7 +19,8 @@ funksjon konk_is_admin(). RLS er på. Seed: kontor Oslo, Stavanger; konkurranse 
 - Brukere: insert/select/delete egne feedback-rader (select kun egne direkte).
 ### Edge function `konk-auth` (verify_jwt=false), POST JSON
 - `{action:"register", display_name, office_id, anonymous}` → 200 `{pin:"123456", session:{access_token,refresh_token,expires_in,expires_at,token_type,user}}`
-- `{action:"login", pin}` → 200 `{session}`; 401 `{error:"invalid_pin"}`; 429 `{error:"too_many_attempts"}` (maks 5 feil/min/IP)
+- `{action:"login", display_name, pin}` → 200 `{session}`; 401 `{error:"invalid_pin"}` (feil navn ELLER pin, samme svar); 429 `{error:"too_many_attempts"}` (maks 5 feil/min per IP og per navn)
+- `register` gir 409 `{error:"name_taken"}` hvis navnet (case-insensitivt) finnes. Navn er unikt og brukes som brukernavn. Pin er per bruker: pin_hash = HMAC(secret, "<user_id>:<pin>"), ikke globalt unik.
 - Pin: 6 siffer, unik, lagres som HMAC-SHA256(pin, secret KONK_PIN_SECRET) hex i konk_profiles.pin_hash. Auth-bruker opprettes med admin API (email `<uuid>@konk.invalid`, passord = HMAC(secret, user_id), email_confirm true); login signerer inn server-side og returnerer session. CORS åpen (OPTIONS).
 ### Edge function `konk-admin` (verify_jwt=true; sjekk konk_is_admin for kallende bruker)
 - `{action:"reset_pin", user_id}` → `{pin}` (ny pin vises kun her; gammel slutter å virke; eksisterende sessions kan beholdes)

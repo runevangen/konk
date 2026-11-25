@@ -47,7 +47,7 @@ function makeBackend(state) {
     if (p.endsWith('/functions/v1/konk-auth')) {
       const b = req.postDataJSON()
       if (b.action === 'register') { state.registered = b; return json({ pin: '482915', session: session() }) }
-      if (b.pin === '123456') return json({ session: session() })
+      if (b.pin === '123456' && String(b.display_name || '').trim().toLowerCase() === 'kari') return json({ session: session() })
       return json({ error: 'invalid_pin' }, 401)
     }
     if (p === '/auth/v1/user') return json(user)
@@ -107,13 +107,14 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     const { ctx, page, errors } = await newPage(browser, state)
     await page.goto(BASE + '/')
     await page.waitForURL('**/login')
-    await page.locator('#pin').fill('999999')
+    await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('999999')
     await page.getByRole('button', { name: 'Logg inn' }).click()
-    await page.getByText('Feil pinkode').waitFor()
+    await page.getByText('Feil navn eller pinkode').waitFor()
     await shot(page, '01-login')
     ok('login: feil pin gir feilmelding')
 
     await page.getByRole('link', { name: 'Ny bruker' }).click()
+    await page.getByRole('heading', { name: 'Ny bruker' }).waitFor()
     await page.getByLabel('Navn', { exact: true }).fill('Kari Nordmann')
     await page.getByLabel('Kontor').selectOption('of1')
     await page.getByRole('button', { name: 'Opprett bruker' }).click()
@@ -144,7 +145,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     const state = freshState()
     const { ctx, page } = await newPage(browser, state)
     await page.goto(BASE + '/login')
-    await page.locator('#pin').fill('123 456')
+    await page.locator('#name').fill('kari'); await page.locator('#pin').fill('123 456')
     await page.getByRole('button', { name: 'Logg inn' }).click()
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
     ok('login: riktig pin')
@@ -155,7 +156,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
   {
     const state = freshState()
     const { ctx, page, errors } = await newPage(browser, state)
-    await page.goto(BASE + '/login'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
     await page.getByRole('link', { name: /Julebrustesten/ }).click()
     await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor()
@@ -203,7 +204,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
   {
     const state = freshState({ status: 'closed', entries: { i1: { id: 'e1', user_id: UID, item_id: 'i1', score: 7, guess_option_id: 'o1', comment: 'ok' } } })
     const { ctx, page } = await newPage(browser, state)
-    await page.goto(BASE + '/login'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
     await page.goto(BASE + '/k/julebrustest')
     await page.getByText('Konkurransen er avsluttet').waitFor()
@@ -241,7 +242,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
   {
     const state = freshState({ status: 'open' })
     const { ctx, page } = await newPage(browser, state)
-    await page.goto(BASE + '/login'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
     await page.goto(BASE + '/k/julebrustest/resultat')
     await page.getByText('Resultatene er ikke klare ennå').waitFor()
@@ -265,7 +266,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
   {
     const state = freshState({ admin: true })
     const { ctx, page } = await newPage(browser, state)
-    await page.goto(BASE + '/login'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
     await page.getByRole('link', { name: 'Admin' }).click()
     await page.getByRole('heading', { name: 'Admin' }).waitFor()

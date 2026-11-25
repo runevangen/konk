@@ -30,9 +30,9 @@ export function register(input: RegisterInput) {
   return call<{ pin: string; session: AuthSession }>('konk-auth', { action: 'register', ...input })
 }
 
-/** konk-auth: login med pin. */
-export function login(pin: string) {
-  return call<{ session: AuthSession }>('konk-auth', { action: 'login', pin })
+/** konk-auth: login med navn + pin. */
+export function login(displayName: string, pin: string) {
+  return call<{ session: AuthSession }>('konk-auth', { action: 'login', display_name: displayName, pin })
 }
 
 /** Gjør session fra konk-auth gjeldende i supabase-js (persisteres av klienten). */
@@ -55,7 +55,8 @@ export async function adminResetPin(userId: string) {
 export function errorMessage(e: unknown): string {
   const code = e instanceof ApiError ? e.code : ''
   switch (code) {
-    case 'invalid_pin': return 'Feil pinkode. Prøv igjen.'
+    case 'invalid_pin': return 'Feil navn eller pinkode. Prøv igjen.'
+    case 'name_taken': return 'Navnet er allerede i bruk. Velg et annet, for eksempel med etternavn eller initial.'
     case 'too_many_attempts': return 'For mange forsøk. Vent ett minutt og prøv igjen.'
     case 'network': return 'Får ikke kontakt med serveren. Sjekk nettet.'
     case 'not_closed': return 'Resultatene er ikke klare ennå.'
