@@ -235,6 +235,39 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await ctx.close()
   }
 
+  // --- Mine svar: alt samlet, forside leder dit, endre-lenke, Ferdig leder dit ---
+  {
+    const state = freshState({ status: 'open', entries: {
+      i1: { id: 'e1', user_id: UID, item_id: 'i1', score: 7, guess_option_id: 'o2', comment: 'Frisk og fin' },
+      i3: { id: 'e3', user_id: UID, item_id: 'i3', score: 9, guess_option_id: null, comment: null },
+    } })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByText('Se og endre svarene dine').click()
+    await page.getByRole('heading', { name: 'Mine svar' }).waitFor()
+    await page.getByText('2 av 6 glass besvart').waitFor()
+    assert.strictEqual(await page.getByTestId('score-1').innerText(), '7')
+    assert.strictEqual(await page.getByTestId('score-3').innerText(), '9')
+    await page.getByText('Julebrus A').waitFor()
+    await page.getByText('Frisk og fin').waitFor()
+    await page.getByText('Vet ikke').waitFor()
+    assert.strictEqual(await page.getByText('Ikke besvart ennå.').count(), 4)
+    await shot(page, '14-mine-svar')
+    // Endre -> riktig glass, med lagrede svar
+    await page.getByRole('link', { name: 'Endre' }).first().click()
+    await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor()
+    assert.strictEqual(await page.locator('.score-grid input[value="7"]').isChecked(), true)
+    // endre score og gå til oversikten via knapp: ny verdi vises (lagring ventes ferdig)
+    await page.locator('.score-grid label:has(input[value="4"])').click()
+    await page.getByRole('button', { name: /Mine svar/ }).click()
+    await page.getByRole('heading', { name: 'Mine svar' }).waitFor()
+    await page.getByText('4', { exact: true }).first().waitFor()
+    assert.strictEqual(await page.getByTestId('score-1').innerText(), '4')
+    ok('mine svar: oversikt over alle svar, endre-lenke og siste versjon vises')
+    await ctx.close()
+  }
+
   // --- Låst + resultat ikke klart ---
   {
     const state = freshState({ status: 'closed', entries: { i1: { id: 'e1', user_id: UID, item_id: 'i1', score: 7, guess_option_id: 'o1', comment: 'ok' } } })

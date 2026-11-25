@@ -26,7 +26,7 @@ export default function Home() {
       {error != null && <ErrorBox error={error} />}
       {data && data.length === 0 && <div className="card"><p>Ingen konkurranser er åpnet ennå. Kom tilbake snart.</p></div>}
       {data?.map(({ c, done, total }) => (
-        <Link key={c.id} to={c.status === 'closed' ? `/k/${c.slug}/resultat` : `/k/${c.slug}`} className="card comp-link">
+        <Link key={c.id} to={c.status === 'closed' ? `/k/${c.slug}/resultat` : done > 0 ? `/k/${c.slug}/mine` : `/k/${c.slug}`} className="card comp-link">
           <div className="row between">
             <h2 style={{ margin: 0 }}>{c.title}</h2>
             <StatusBadge status={c.status} />
@@ -38,7 +38,7 @@ export default function Home() {
             </div>
           )}
           <p className="small" style={{ margin: '10px 0 0', color: 'var(--red)', fontWeight: 700 }}>
-            {c.status === 'closed' ? 'Se resultatene →' : done > 0 && done >= total ? 'Se eller endre svarene dine →' : 'Fortsett å smake →'}
+            {c.status === 'closed' ? 'Se resultatene →' : done > 0 ? 'Se og endre svarene dine →' : 'Begynn å smake →'}
           </p>
         </Link>
       ))}
