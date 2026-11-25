@@ -97,15 +97,24 @@ function makeBackend(state) {
       if (state.liveOff) return json({ message: 'live_off' }, 400)
       state.liveCalls = (state.liveCalls || 0) + 1
       const bump = state.liveCalls > 1 ? 1 : 0
-      const off = (id, name, a, n) => ({ office_id: id, name, avg_score: a, n })
+      const off = (id, name, a, n, h = 0, g = 0) => ({ office_id: id, name, avg_score: a, n, hits: h, guesses: g, hit_rate: g >= 2 ? h / g : null })
       return json({
         status: state.status, min_n: 2, names: !!state.names, updated_at: '2026-12-01T10:00:00Z',
-        overall: { n_entries: 7 + bump, participants: 3, avg: 7.2 },
-        offices: [{ office_id: 'of1', name: 'Oslo', avg_score: 7.8, n_entries: 4, participants: 2 }, { office_id: 'of2', name: 'Stavanger', avg_score: null, n_entries: 1, participants: 1 }],
-        items: [
-          { item_id: 'i1', position: 1, label: 'Glass 1', brus: state.names ? 'Ringnes' : null, avg_score: 6.5 + bump, n: 3, by_office: [off('of1', 'Oslo', 7, 2), off('of2', 'Stavanger', null, 1)] },
-          { item_id: 'i2', position: 2, label: 'Glass 2', brus: state.names ? 'Askim' : null, avg_score: 8.25, n: 4, by_office: [off('of1', 'Oslo', 8.5, 3), off('of2', 'Stavanger', null, 1)] },
+        overall: { n_entries: 7 + bump, participants: 3, avg: 7.2, hits: 3, guesses: 7, hit_rate: 3 / 7 },
+        offices: [
+          { office_id: 'of1', name: 'Oslo', avg_score: 7.8, n_entries: 4, participants: 2, hits: 3, guesses: 4, hit_rate: 0.75 },
+          { office_id: 'of2', name: 'Stavanger', avg_score: null, n_entries: 1, participants: 1, hits: 0, guesses: 1, hit_rate: null },
         ],
+        items: [
+          { item_id: 'i1', position: 1, label: 'Glass 1', brus: state.names ? 'Ringnes' : null, avg_score: 6.5 + bump, n: 3, hits: 1, guesses: 3, hit_rate: 1 / 3, by_office: [off('of1', 'Oslo', 7, 2, 1, 2), off('of2', 'Stavanger', null, 1, 0, 1)] },
+          { item_id: 'i2', position: 2, label: 'Glass 2', brus: state.names ? 'Askim' : null, avg_score: 8.25, n: 4, hits: 2, guesses: 4, hit_rate: 0.5, by_office: [off('of1', 'Oslo', 8.5, 3, 2, 3), off('of2', 'Stavanger', null, 1, 0, 1)] },
+        ],
+        people: [
+          { name: 'Kari', office_id: 'of1', office_name: 'Oslo', hits: 2, guesses: 2, answered: 2 },
+          { name: 'Anonym', office_id: 'of1', office_name: 'Oslo', hits: 1, guesses: 2, answered: 2 },
+          { name: 'Ola', office_id: 'of2', office_name: 'Stavanger', hits: 0, guesses: 1, answered: 1 },
+        ],
+        people_min: 3,
       })
     }
     if (p.endsWith('/rpc/konk_results')) return state.status === 'closed' || state.admin ? json(RESULTS) : json({ message: 'not_closed' }, 400)
@@ -361,6 +370,43 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByText('Glass 1 – Ringnes').first().waitFor()
     await shot(page, '13-live-tavle-brusnavn')
     ok('live tavle: viser brusnavn når admin har slått det på')
+    await ctx.close()
+  }
+  {
+    // --- Live tavle: Gjettet riktig (per glass, per kontor, samlet, og beste gjettere) ---
+    const state = freshState({ status: 'open' })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/k/julebrustest/tavle')
+    await page.getByRole('heading', { name: 'Live tavle' }).waitFor()
+    await page.getByRole('tab', { name: 'Gjettet riktig' }).click()
+    await page.getByRole('heading', { name: 'Gjettet riktig per glass' }).waitFor()
+    // rangert etter andel riktige: Glass 2 (50 %) foran Glass 1 (33 %)
+    assert.strictEqual(await page.locator('.bar-row strong').first().innerText(), 'Glass 2')
+    await page.getByText('50 %').first().waitFor()
+    await page.getByText('2 av 4 riktig').first().waitFor()
+    await page.getByText('3 av 7 gjetninger riktig').waitFor()
+    // beste gjettere, anonyme som «Anonym»
+    const names = await page.locator('[data-testid="tavle-person"] strong').evaluateAll((els) => els.map((e) => e.textContent).filter((t) => t && isNaN(Number(t))))
+    assert.deepStrictEqual(names, ['Kari', 'Anonym', 'Ola'])
+    await shot(page, '15-tavle-gjettet-riktig')
+    // kontorfane: bare kontorets egne gjettere og tall
+    await page.getByRole('tab', { name: 'Oslo' }).click()
+    await page.getByText('Ola').waitFor({ state: 'detached' })
+    assert.strictEqual(await page.locator('[data-testid="tavle-person"]').count(), 2)
+    await page.getByText('2 av 3 riktig').first().waitFor()
+    // rekkefølgen følger andelen i alle faner
+    for (const tab of ['Samlet', 'Oslo', 'Stavanger']) {
+      await page.getByRole('tab', { name: tab }).click()
+      const avgs = await page.locator('[data-testid="tavle-row"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-avg')))
+      const nums = avgs.filter((a) => a !== '').map(Number)
+      assert.deepStrictEqual(nums, [...nums].sort((a, b) => b - a), `gjetting: rekkefølge følger ikke andel i ${tab}: ${avgs}`)
+    }
+    // tilbake til Poeng
+    await page.getByRole('tab', { name: 'Poeng' }).click()
+    await page.getByRole('heading', { name: 'Snittscore per glass' }).waitFor()
+    ok('live tavle: gjettet riktig per glass, kontor og samlet, med beste gjettere (anonyme som Anonym)')
     await ctx.close()
   }
   {

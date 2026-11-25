@@ -1,0 +1,2 @@
+-- Live tavle: gjettet riktig (hits/guesses/hit_rate per glass, kontor og samlet) og beste gjettere (people, vises ved >= 3 deltakere).
+-- Tall med færre enn 2 gjetninger skjules. (konk_live_board(uuid) er oppdatert i Supabase; se git-historikk for kroppen.)
