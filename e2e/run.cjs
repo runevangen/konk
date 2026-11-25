@@ -454,6 +454,11 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await btn.click()
     await page.getByText(/Nullstilt: slettet/).waitFor()
     ok('admin: slett enkeltsvar, alle fra bruker og nullstill (krever SLETT)')
+    // snarvei fra Konkurranser-fanen
+    await page.getByRole('tab', { name: 'Konkurranser' }).click()
+    await page.getByRole('button', { name: 'Nullstill svar …' }).first().click()
+    await page.getByRole('heading', { name: 'Nullstill konkurransen' }).waitFor()
+    ok('admin: Nullstill svar-snarvei fra Konkurranser-fanen')
     await ctx.close()
   }
 

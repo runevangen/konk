@@ -34,7 +34,7 @@ export default function Admin() {
           </select>
         </label>
       )}
-      {tab === 'Konkurranser' && <CompetitionsTab comps={comps.data ?? []} reload={comps.reload} />}
+      {tab === 'Konkurranser' && <CompetitionsTab comps={comps.data ?? []} reload={comps.reload} onReset={(id) => { setCompId(id); setTab('Svar') }} />}
       {tab === 'Glass og fasit' && comp && <ItemsTab comp={comp} />}
       {tab === 'Gjetteliste' && comp && <OptionsTab comp={comp} />}
       {tab === 'Brukere' && <UsersTab />}
@@ -51,7 +51,7 @@ function useAction() {
 }
 
 // ---------- Konkurranser ----------
-function CompetitionsTab({ comps, reload }: { comps: Competition[]; reload: () => Promise<void> }) {
+function CompetitionsTab({ comps, reload, onReset }: { comps: Competition[]; reload: () => Promise<void>; onReset: (id: Id) => void }) {
   const [editing, setEditing] = useState<Partial<Competition> | null>(null)
   const { err, run } = useAction()
   async function submit(e: FormEvent) {
@@ -71,7 +71,10 @@ function CompetitionsTab({ comps, reload }: { comps: Competition[]; reload: () =
           <div className="row between"><strong>{c.title}</strong><StatusBadge status={c.status} /></div>
           <p className="soft small">/{c.slug} · {c.kind}{c.live_board ? ' · live tavle på' : ''}</p>
           {c.live_board && c.status !== 'draft' && <p className="small"><a href={`/k/${c.slug}/tavle`}>Åpne live tavle →</a></p>}
-          <button className="btn ghost small" onClick={() => setEditing(c)}>Rediger</button>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn ghost small" onClick={() => setEditing(c)}>Rediger</button>
+            <button className="btn ghost small" onClick={() => onReset(c.id)}>Nullstill svar …</button>
+          </div>
         </div>
       ))}
       {!editing && <button className="btn gold" onClick={() => setEditing({ status: 'draft', kind: 'brus', live_board: false, live_board_names: false })}>+ Ny konkurranse</button>}
