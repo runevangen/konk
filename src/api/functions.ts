@@ -44,6 +44,14 @@ export async function applySession(session: AuthSession) {
   if (error) throw new ApiError('session', 0, error.message)
 }
 
+/** konk-auth: bytt egen pinkode (krever innlogget bruker og nåværende pinkode). */
+export async function changePin(oldPin: string, newPin: string) {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new ApiError('not_signed_in', 401)
+  return call<{ ok: true }>('konk-auth', { action: 'change_pin', old_pin: oldPin, new_pin: newPin }, token)
+}
+
 /** konk-admin: reset pin. */
 export async function adminResetPin(userId: string) {
   const { data } = await supabase.auth.getSession()
@@ -56,6 +64,8 @@ export function errorMessage(e: unknown): string {
   const code = e instanceof ApiError ? e.code : ''
   switch (code) {
     case 'invalid_pin': return 'Feil navn eller pinkode. Prøv igjen.'
+    case 'weak_pin': return 'Velg en kode som er vanskeligere å gjette. Ikke samme siffer (111111) eller rekke (123456).'
+    case 'same_pin': return 'Den nye koden må være ulik den gamle.'
     case 'name_taken': return 'Navnet er allerede i bruk. Velg et annet, for eksempel med etternavn eller initial.'
     case 'too_many_attempts': return 'For mange forsøk. Vent ett minutt og prøv igjen.'
     case 'network': return 'Får ikke kontakt med serveren. Sjekk nettet.'
