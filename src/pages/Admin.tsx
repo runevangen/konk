@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
-  addOption, deleteItem, deleteOption, listAllFeedback, listAnswers, listCommentEntries, listCompetitions, listItems, listOffices,
+  addOption, deleteAllAnswers, deleteEntry, deleteItem, deleteUserAnswers, listCompetitionEntries, deleteOption, listAllFeedback, listAnswers, listCommentEntries, listCompetitions, listItems, listOffices,
   listOptions, listProfiles, saveCompetition, saveItem, setAnswer, setEntryHidden, setFeedbackHidden,
 } from '../api/data'
 import { adminResetPin, errorMessage } from '../api/functions'
@@ -9,7 +9,7 @@ import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
 import { validateSlug } from '../lib/validation'
 
-const TABS = ['Konkurranser', 'Glass og fasit', 'Gjetteliste', 'Brukere', 'Moderering'] as const
+const TABS = ['Konkurranser', 'Glass og fasit', 'Gjetteliste', 'Brukere', 'Svar', 'Moderering'] as const
 type Tab = (typeof TABS)[number]
 
 export default function Admin() {
@@ -37,6 +37,7 @@ export default function Admin() {
       {tab === 'Glass og fasit' && comp && <ItemsTab comp={comp} />}
       {tab === 'Gjetteliste' && comp && <OptionsTab comp={comp} />}
       {tab === 'Brukere' && <UsersTab />}
+      {tab === 'Svar' && comp && <AnswersTab comp={comp} />}
       {tab === 'Moderering' && comp && <ModerationTab comp={comp} />}
     </>
   )
@@ -251,6 +252,82 @@ function ModerationTab({ comp }: { comp: Competition }) {
             <button className="btn ghost small" onClick={() => run(async () => { await setFeedbackHidden(f.id, !f.hidden); await d.reload() })}>{f.hidden ? 'Vis' : 'Skjul'}</button>
           </div>
         ))}
+      </div>
+    </>
+  )
+}
+
+// ---------- Svar (slett) ----------
+function AnswersTab({ comp }: { comp: Competition }) {
+  const d = useAsync(async () => {
+    const [items, options, profiles, offices] = await Promise.all([listItems(comp.id), listOptions(comp.id), listProfiles(), listOffices()])
+    const entries = await listCompetitionEntries(items.map((i) => i.id))
+    return { items, options, profiles, offices, entries }
+  }, [comp.id])
+  const [open, setOpen] = useState<Id | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [confirmAll, setConfirmAll] = useState('')
+  const { err, run } = useAction()
+  if (d.loading && !d.data) return <Loading />
+  if (!d.data) return null
+  const { items, options, profiles, offices, entries } = d.data
+  const itemLabel = (id: Id) => items.find((i) => i.id === id)?.label ?? '?'
+  const optionLabel = (id: Id | null) => (id ? options.find((o) => o.id === id)?.label ?? '?' : '–')
+  const byUser = new Map<Id, typeof entries>()
+  for (const e of entries) byUser.set(e.user_id, [...(byUser.get(e.user_id) ?? []), e])
+  const users = [...byUser.keys()].map((id) => profiles.find((p) => p.id === id) ?? ({ id, display_name: 'ukjent bruker', office_id: null, anonymous: false, is_admin: false } as Profile))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, 'nb'))
+  const itemIds = items.map((i) => i.id)
+
+  async function delOne(e: (typeof entries)[number], who: string) {
+    if (!confirm(`Slette svaret fra ${who} på ${itemLabel(e.item_id)}? Dette kan ikke angres.`)) return
+    await run(async () => { await deleteEntry(e.id); setMsg('Svaret er slettet.'); await d.reload() })
+  }
+  async function delUser(p: Profile) {
+    if (!confirm(`Slette ALLE svar og tilbakemeldinger fra ${p.display_name} i ${comp.title}? Dette kan ikke angres.`)) return
+    await run(async () => { const n = await deleteUserAnswers(p.id, comp.id, itemIds); setMsg(`Slettet ${n} svar fra ${p.display_name}.`); setOpen(null); await d.reload() })
+  }
+  async function delAll() {
+    await run(async () => { const n = await deleteAllAnswers(comp.id, itemIds); setMsg(`Nullstilt: slettet ${n} svar og alle tilbakemeldinger.`); setConfirmAll(''); setOpen(null); await d.reload() })
+  }
+
+  return (
+    <>
+      {err && <div className="on-bg-error" role="alert">{err}</div>}
+      {msg && <div className="card-alt" role="status">{msg}</div>}
+      <div className="card">
+        <h2>Svar i {comp.title} ({entries.length})</h2>
+        <p className="soft small">Du kan slette enkeltsvar, alle svar fra én bruker, eller nullstille hele konkurransen. Sletting kan ikke angres, og snitt og tavle oppdateres med en gang.</p>
+        {users.length === 0 && <p className="soft">Ingen har svart ennå.</p>}
+        {users.map((p) => {
+          const list = (byUser.get(p.id) ?? []).slice().sort((a, b) => (items.find((i) => i.id === a.item_id)?.position ?? 0) - (items.find((i) => i.id === b.item_id)?.position ?? 0))
+          const isOpen = open === p.id
+          return (
+            <div key={p.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <div className="row between">
+                <button className="btn ghost small" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : p.id)} style={{ textAlign: 'left' }}>
+                  <strong>{p.display_name}</strong> · {offices.find((o) => o.id === p.office_id)?.name ?? '–'}{p.anonymous ? ' · anonym' : ''} · {list.length} svar {isOpen ? '▲' : '▼'}
+                </button>
+                <button className="btn small" onClick={() => delUser(p)}>Slett alle</button>
+              </div>
+              {isOpen && list.map((e) => (
+                <div key={e.id} className="row between" style={{ padding: '6px 0 6px 12px', alignItems: 'flex-start' }}>
+                  <div className="small" style={{ flex: 1, minWidth: 0 }}>
+                    <strong>{itemLabel(e.item_id)}</strong>: score {e.score ?? '–'}, gjettet {optionLabel(e.guess_option_id)}
+                    {e.comment ? <div className="soft">«{e.comment}»</div> : null}
+                  </div>
+                  <button className="btn ghost small" onClick={() => delOne(e, p.display_name)}>Slett</button>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+      <div className="card">
+        <h2>Nullstill konkurransen</h2>
+        <p className="soft small">Sletter alle svar og alle tilbakemeldinger i {comp.title}. Glass, fasit, gjetteliste og brukere beholdes. Nyttig etter at du har testet. Skriv <strong>SLETT</strong> for å bekrefte.</p>
+        <input type="text" aria-label="Skriv SLETT for å bekrefte" value={confirmAll} onChange={(e) => setConfirmAll(e.target.value)} placeholder="SLETT" />
+        <button className="btn" style={{ marginTop: 10 }} disabled={confirmAll !== 'SLETT'} onClick={delAll}>Slett alle svar</button>
       </div>
     </>
   )
