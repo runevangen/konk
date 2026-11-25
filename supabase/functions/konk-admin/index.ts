@@ -44,12 +44,9 @@ Deno.serve(async (req) => {
     if (!/^[0-9a-f-]{36}$/i.test(user_id)) return json({ error: "invalid_user_id" }, 400);
     const { data: target } = await admin.from("konk_profiles").select("id").eq("id", user_id).maybeSingle();
     if (!target) return json({ error: "not_found" }, 404);
-    for (let i = 0; i < 8; i++) {
-      const pin = newPin();
-      const { error } = await admin.from("konk_profiles").update({ pin_hash: await hmac(secret, pin) }).eq("id", user_id);
-      if (!error) return json({ pin });
-      if (error.code !== "23505") break;
-    }
+    const pin = newPin();
+    const { error } = await admin.from("konk_profiles").update({ pin_hash: await hmac(secret, `${user_id}:${pin}`) }).eq("id", user_id);
+    if (!error) return json({ pin });
     return json({ error: "reset_failed" }, 500);
   }
   return json({ error: "unknown_action" }, 400);
