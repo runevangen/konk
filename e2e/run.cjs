@@ -82,6 +82,13 @@ function makeBackend(state) {
     }
     if (p.endsWith('/rest/v1/konk_guess_options')) return json(OPTIONS)
     if (p.endsWith('/rest/v1/konk_entries')) {
+      if (req.method() === 'DELETE') {
+        const idq = (q.get('id') || '').replace('eq.', ''), uq = (q.get('user_id') || '').replace('eq.', '')
+        state.deletes = state.deletes || []
+        const hit = Object.entries(state.entries).filter(([, e]) => (idq && e.id === idq) || (!idq && uq && e.user_id === uq) || (!idq && !uq))
+        for (const [k, e] of hit) { delete state.entries[k]; state.deletes.push(e.id) }
+        return json(hit.map(([, e]) => ({ id: e.id })))
+      }
       if (req.method() === 'POST') { const b = req.postDataJSON(); state.saves.push(b); state.entries[b.item_id] = { id: 'e' + b.item_id, ...b }; return json([], 201) }
       return json(Object.values(state.entries))
     }
@@ -366,6 +373,39 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByText('/julebrustest').waitFor()
     await shot(page, '07-admin')
     ok('admin: lastes for admin')
+    await ctx.close()
+  }
+  {
+    // --- Admin: slett svar (enkeltsvar, alle fra bruker, nullstill) ---
+    const state = freshState({ admin: true })
+    state.entries = {
+      i1: { id: 'e1', item_id: 'i1', user_id: 'u1', score: 7, guess_option_id: 'o2', comment: 'Fin brus', hidden: false },
+      i2: { id: 'e2', item_id: 'i2', user_id: 'u1', score: 5, guess_option_id: 'o3', comment: null, hidden: false },
+    }
+    const { ctx, page } = await newPage(browser, state)
+    page.on('dialog', (d) => d.accept())
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/admin')
+    await page.getByRole('tab', { name: 'Svar' }).click()
+    await page.getByText(/Svar i Julebrustesten 2026 \(2\)/).waitFor()
+    await page.getByRole('button', { name: /2 svar/ }).click()
+    await page.getByText('Fin brus').waitFor()
+    await shot(page, '11-admin-svar')
+    await page.getByRole('button', { name: 'Slett', exact: true }).first().click()
+    await page.getByText('Svaret er slettet.').waitFor()
+    assert.deepStrictEqual(state.deletes, ['e1'])
+    await page.getByRole('button', { name: 'Slett alle', exact: true }).click()
+    await page.getByText(/Slettet 1 svar fra/).waitFor()
+    assert.deepStrictEqual(state.deletes, ['e1', 'e2'])
+    // nullstill krever at man skriver SLETT
+    const btn = page.getByRole('button', { name: 'Slett alle svar', exact: true })
+    assert.strictEqual(await btn.isDisabled(), true)
+    await page.getByLabel('Skriv SLETT for å bekrefte').fill('SLETT')
+    assert.strictEqual(await btn.isDisabled(), false)
+    await btn.click()
+    await page.getByText(/Nullstilt: slettet/).waitFor()
+    ok('admin: slett enkeltsvar, alle fra bruker og nullstill (krever SLETT)')
     await ctx.close()
   }
 
