@@ -2,7 +2,7 @@ export type Id = string
 export type CompetitionStatus = 'draft' | 'open' | 'closed'
 
 export interface Office { id: Id; name: string }
-export interface Competition { id: Id; slug: string; title: string; kind: string; status: CompetitionStatus }
+export interface Competition { id: Id; slug: string; title: string; kind: string; status: CompetitionStatus; live_board: boolean }
 export interface Item { id: Id; competition_id: Id; position: number; label: string; image_path: string | null }
 export interface GuessOption { id: Id; competition_id: Id; label: string }
 export interface Entry {
@@ -45,4 +45,16 @@ export interface FeedbackRow {
 }
 export interface MyFeedback {
   id: Id; competition_id: Id; item_id: Id | null; target: FeedbackTarget; emoji: string | null; comment: string | null
+}
+
+export interface LiveOffice { office_id: Id; name: string; avg_score: number | null; n_entries: number; participants: number }
+export interface LiveItemOffice { office_id: Id; name: string; avg_score: number | null; n: number }
+export interface LiveItem { item_id: Id; position: number; label: string; avg_score: number | null; n: number; by_office: LiveItemOffice[] }
+export interface LiveBoard {
+  status: CompetitionStatus
+  min_n: number
+  updated_at: string
+  overall: { n_entries: number; participants: number; avg: number | null }
+  offices: LiveOffice[]
+  items: LiveItem[]
 }
