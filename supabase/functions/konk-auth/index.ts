@@ -79,9 +79,10 @@ Deno.serve(async (req) => {
   if (body.action === "login") {
     const ip = (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown").trim();
     const since = new Date(Date.now() - 60_000).toISOString();
-    const { count } = await admin.from("konk_login_attempts").select("id", { count: "exact", head: true })
-      .eq("ip", ip).gte("created_at", since);
-    if ((count ?? 0) >= 5) return json({ error: "too_many_attempts" }, 429);
+    const { data: recent, error: rateErr } = await admin.from("konk_login_attempts").select("id")
+      .eq("ip", ip).gte("created_at", since).limit(5);
+    if (rateErr) return json({ error: "rate_check_failed" }, 500);
+    if ((recent?.length ?? 0) >= 5) return json({ error: "too_many_attempts" }, 429);
 
     const pin = typeof body.pin === "string" ? body.pin.trim() : "";
     let userId: string | null = null;
