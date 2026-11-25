@@ -108,16 +108,16 @@ export default function Tavle() {
         {entries === 0 && <p>Ingen har stemt ennå. Tavlen fylles ut etter hvert som deltakerne gir poeng.</p>}
         {ranked.map(({ rank, row }) => (
           <div key={row.item_id} className={`bar-row ${changed.has(row.item_id) ? 'pulse' : ''}`}>
-            <span><span className={`rank r${rank === 1 && row.avg != null ? 1 : ''}`} style={{ marginRight: 8 }}>{row.avg != null ? rank : '·'}</span><strong>{row.label}</strong></span>
+            <span><span className={`rank ${rank === 1 && row.avg != null ? 'r1' : ''}`} style={{ marginRight: 8 }}>{row.avg != null ? rank : '·'}</span><strong>Plass {rank}</strong></span>
             <strong>{row.avg != null ? formatScore(row.avg, 2) : <span className="soft small">venter</span>}</strong>
-            <div className="bar" role="img" aria-label={`${row.label}: ${row.avg != null ? formatScore(row.avg, 2) : 'ikke nok svar'}`}>
+            <div className="bar" role="img" aria-label={`Plass ${rank}: ${row.avg != null ? formatScore(row.avg, 2) : 'ikke nok svar'}`}>
               <i style={{ width: `${scoreBarWidth(row.avg)}%` }} />
             </div>
             <span className="soft small" style={{ gridColumn: '1 / -1' }}>{pluralize(row.n, 'svar', 'svar')}</span>
           </div>
         ))}
         <p className="soft small" style={{ margin: '10px 0 0' }}>
-          Glassene vises uten navn. Snitt vises når minst {board.min_n} har svart, slik at ingen enkeltpersoners poeng avsløres.
+          Tavlen viser rangeringen uten å si hvilket glass som er hvilket. Snitt vises når minst {board.min_n} har svart, slik at ingen enkeltpersoners poeng avsløres.
         </p>
       </div>
 

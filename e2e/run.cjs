@@ -265,9 +265,11 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('tab', { name: 'Samlet' }).waitFor()
     await page.getByRole('tab', { name: 'Oslo' }).waitFor()
     await page.getByRole('tab', { name: 'Stavanger' }).waitFor()
-    // rangering: Glass 2 (8,25) foran Glass 1 (6,50)
+    // rangering uten glassnavn: plass 1 = 8,25, plass 2 = 6,50
     const first = await page.locator('.bar-row strong').first().innerText()
-    assert.strictEqual(first, 'Glass 2')
+    assert.strictEqual(first, 'Plass 1')
+    assert.ok(!(await page.locator('main, #root').first().innerText()).includes('Glass 2'), 'glassnavn skal ikke vises på tavlen')
+    assert.strictEqual(await page.locator('.bar-row strong').nth(1).innerText(), '8,25')
     await page.getByText('8,25').first().waitFor()
     await shot(page, '08-live-tavle-samlet')
     await page.getByRole('tab', { name: 'Stavanger' }).click()
