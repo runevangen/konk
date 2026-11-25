@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
+import { cleanEnv, cleanUrl } from '../lib/env'
 
-export const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL ?? ''
-export const SUPABASE_ANON_KEY: string = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
+export const SUPABASE_URL: string = cleanUrl(import.meta.env.VITE_SUPABASE_URL)
+export const SUPABASE_ANON_KEY: string = cleanEnv(import.meta.env.VITE_SUPABASE_ANON_KEY)
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY mangler (se .env.example)')
