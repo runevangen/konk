@@ -26,21 +26,28 @@ export default function Home() {
       {error != null && <ErrorBox error={error} />}
       {data && data.length === 0 && <div className="card"><p>Ingen konkurranser er åpnet ennå. Kom tilbake snart.</p></div>}
       {data?.map(({ c, done, total }) => (
-        <Link key={c.id} to={c.status === 'closed' ? `/k/${c.slug}/resultat` : done > 0 ? `/k/${c.slug}/mine` : `/k/${c.slug}`} className="card comp-link">
-          <div className="row between">
-            <h2 style={{ margin: 0 }}>{c.title}</h2>
-            <StatusBadge status={c.status} />
-          </div>
-          {c.status === 'open' && (
-            <div style={{ marginTop: 12 }}>
-              <p className="soft small" style={{ margin: '0 0 6px' }}>{done} av {total} glass smakt</p>
-              <Progress value={done} max={total} label={`Fremdrift ${c.title}`} />
+        <div key={c.id} className="card">
+          <Link to={c.status === 'closed' ? `/k/${c.slug}/resultat` : done > 0 ? `/k/${c.slug}/mine` : `/k/${c.slug}`} className="comp-link">
+            <div className="row between">
+              <h2 style={{ margin: 0 }}>{c.title}</h2>
+              <StatusBadge status={c.status} />
             </div>
+            {c.status === 'open' && (
+              <div style={{ marginTop: 12 }}>
+                <p className="soft small" style={{ margin: '0 0 6px' }}>{done} av {total} glass smakt</p>
+                <Progress value={done} max={total} label={`Fremdrift ${c.title}`} />
+              </div>
+            )}
+            <p className="small" style={{ margin: '10px 0 0', color: 'var(--red)', fontWeight: 700 }}>
+              {c.status === 'closed' ? 'Se resultatene →' : done > 0 ? 'Se og endre svarene dine →' : 'Begynn å smake →'}
+            </p>
+          </Link>
+          {c.live_board && c.status !== 'draft' && (
+            <p style={{ margin: '14px 0 0' }}>
+              <Link className="btn gold block" to={`/k/${c.slug}/tavle`}>📊 Se live tavle</Link>
+            </p>
           )}
-          <p className="small" style={{ margin: '10px 0 0', color: 'var(--red)', fontWeight: 700 }}>
-            {c.status === 'closed' ? 'Se resultatene →' : done > 0 ? 'Se og endre svarene dine →' : 'Begynn å smake →'}
-          </p>
-        </Link>
+        </div>
       ))}
     </>
   )
