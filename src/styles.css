@@ -88,7 +88,7 @@ input.pin { font-size: 2rem; letter-spacing: .5em; text-align: center; font-vari
 
 /* Pin */
 .pin-box { background: #fff; border: 3px dashed var(--red); border-radius: var(--radius); padding: 18px; text-align: center; margin: 12px 0; }
-.pin-code { font: 700 2.6rem ui-monospace, Menlo, monospace; letter-spacing: .3em; color: var(--ink); padding-left: .3em; user-select: all; }
+.pin-code { margin-bottom: 14px; font: 700 2.6rem ui-monospace, Menlo, monospace; letter-spacing: .3em; color: var(--ink); padding-left: .3em; user-select: all; }
 
 /* Konkurranseliste */
 .comp-link { display: block; text-decoration: none; color: inherit; }
@@ -158,7 +158,7 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .hidden-row { opacity: .65; text-decoration: line-through; }
 
 /* Snø */
-.snow { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
+.snow { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
 .snow i { position: absolute; top: -12px; width: var(--s, 6px); height: var(--s, 6px); border-radius: 50%; background: #fff; opacity: .75; animation: fall var(--d, 12s) linear var(--delay, 0s) infinite; left: var(--x); }
 @keyframes fall { from { transform: translate3d(0, -10px, 0); } to { transform: translate3d(var(--drift, 30px), 105vh, 0); } }
 @media (prefers-reduced-motion: reduce) { .snow { display: none; } * { scroll-behavior: auto !important; } }
