@@ -78,6 +78,11 @@ input.pin { font-size: 2rem; letter-spacing: .5em; text-align: center; font-vari
 /* Knapper */
 .btn { font: inherit; font-weight: 700; min-height: 48px; padding: 10px 20px; border-radius: 999px; border: 2px solid transparent; cursor: pointer; background: var(--red); color: var(--on-red); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .card a.btn, .card-alt a.btn { color: var(--on-red); }
+/* Varianter må ha minst samme spesifisitet som regelen over, ellers arver de hvit tekst inni kort */
+.card a.btn.green, .card-alt a.btn.green { color: var(--on-green); }
+.card a.btn.gold, .card-alt a.btn.gold { color: var(--on-gold); }
+.card a.btn.ghost, .card-alt a.btn.ghost { color: var(--ink); }
+.card a.btn.ghost-light, .card-alt a.btn.ghost-light { color: var(--on-bg); }
 .btn.green { background: var(--green); color: var(--on-green); }
 .btn.gold { background: var(--gold); color: var(--on-gold); }
 .btn.ghost { background: transparent; color: var(--ink); border-color: var(--border-strong); }
