@@ -164,3 +164,18 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 @media (prefers-reduced-motion: reduce) { .snow { display: none; } * { scroll-behavior: auto !important; } }
 
 @media (min-width: 640px) { .container { padding-top: 28px; } h1 { font-size: 2rem; } }
+
+/* Live tavle */
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.tab { min-height: 44px; padding: 8px 16px; border-radius: 999px; border: 2px solid var(--border-strong); background: var(--card); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.tab.on { background: var(--green); color: #fff; border-color: var(--green); }
+.live-badge { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; padding: 4px 12px; border-radius: 999px; background: var(--card); color: var(--ink); }
+.live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; animation: live-pulse 1.6s ease-in-out infinite; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.bar > i { transition: width .8s ease; }
+.bar-row.pulse { animation: row-pulse 1.8s ease; }
+@keyframes row-pulse { 0% { background: var(--gold); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .live-dot, .bar-row.pulse { animation: none; }
+  .bar > i { transition: none; }
+}

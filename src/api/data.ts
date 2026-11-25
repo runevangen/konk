@@ -1,6 +1,6 @@
 import { ApiError, supabase } from './client'
 import type {
-  Competition, CompetitionStatus, Entry, FeedbackRow, FeedbackTarget, GuessOption, Id, Item, MyFeedback, Office, Profile, Results,
+  LiveBoard, Competition, CompetitionStatus, Entry, FeedbackRow, FeedbackTarget, GuessOption, Id, Item, MyFeedback, Office, Profile, Results,
 } from './types'
 
 function check<T>(r: { data: T | null; error: { message: string } | null }): T {
@@ -23,13 +23,13 @@ export async function updateProfile(userId: Id, patch: { display_name: string; a
   check(r)
 }
 export async function listCompetitions(includeDraft = false) {
-  let q = supabase.from('konk_competitions').select('id,slug,title,kind,status').order('title')
+  let q = supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board').order('title')
   if (!includeDraft) q = q.neq('status', 'draft')
   return check(await q) as Competition[]
 }
 export async function getCompetition(slug: string) {
   return check(
-    await supabase.from('konk_competitions').select('id,slug,title,kind,status').eq('slug', slug).maybeSingle(),
+    await supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board').eq('slug', slug).maybeSingle(),
   ) as Competition | null
 }
 export async function listItems(competitionId: Id) {
@@ -67,6 +67,11 @@ export async function getResults(competitionId: Id) {
   if (r.error) throw new ApiError(r.error.message.includes('not_closed') ? 'not_closed' : 'db', 0, r.error.message)
   return r.data as Results
 }
+export async function getLiveBoard(competitionId: Id) {
+  const r = await supabase.rpc('konk_live_board', { p_competition: competitionId })
+  if (r.error) throw new ApiError(r.error.message.includes('live_off') ? 'live_off' : 'db', 0, r.error.message)
+  return r.data as LiveBoard
+}
 export async function getFeedback(competitionId: Id) {
   return check(await supabase.rpc('konk_get_feedback', { p_competition: competitionId })) as FeedbackRow[]
 }
@@ -85,7 +90,7 @@ export async function deleteFeedback(id: Id) {
 }
 
 // ---- admin ----
-export async function saveCompetition(c: { id?: Id; slug: string; title: string; kind: string; status: CompetitionStatus }) {
+export async function saveCompetition(c: { id?: Id; slug: string; title: string; kind: string; status: CompetitionStatus; live_board: boolean }) {
   const { id, ...rest } = c
   if (id) check(await supabase.from('konk_competitions').update(rest).eq('id', id))
   else check(await supabase.from('konk_competitions').insert(rest))

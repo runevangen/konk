@@ -58,7 +58,7 @@ function CompetitionsTab({ comps, reload }: { comps: Competition[]; reload: () =
     const slugErr = validateSlug(editing.slug ?? '')
     if (slugErr || !editing.title?.trim()) { alert(slugErr ?? 'Tittel mangler'); return }
     await run(async () => {
-      await saveCompetition({ id: editing.id, slug: editing.slug!, title: editing.title!.trim(), kind: editing.kind || 'brus', status: editing.status ?? 'draft' })
+      await saveCompetition({ id: editing.id, slug: editing.slug!, title: editing.title!.trim(), kind: editing.kind || 'brus', status: editing.status ?? 'draft', live_board: !!editing.live_board })
       setEditing(null); await reload()
     })
   }
@@ -67,11 +67,12 @@ function CompetitionsTab({ comps, reload }: { comps: Competition[]; reload: () =
       {comps.map((c) => (
         <div className="card" key={c.id}>
           <div className="row between"><strong>{c.title}</strong><StatusBadge status={c.status} /></div>
-          <p className="soft small">/{c.slug} · {c.kind}</p>
+          <p className="soft small">/{c.slug} · {c.kind}{c.live_board ? ' · live tavle på' : ''}</p>
+          {c.live_board && c.status !== 'draft' && <p className="small"><a href={`/k/${c.slug}/tavle`}>Åpne live tavle →</a></p>}
           <button className="btn ghost small" onClick={() => setEditing(c)}>Rediger</button>
         </div>
       ))}
-      {!editing && <button className="btn gold" onClick={() => setEditing({ status: 'draft', kind: 'brus' })}>+ Ny konkurranse</button>}
+      {!editing && <button className="btn gold" onClick={() => setEditing({ status: 'draft', kind: 'brus', live_board: false })}>+ Ny konkurranse</button>}
       {editing && (
         <form className="card" onSubmit={submit}>
           <h2>{editing.id ? 'Rediger konkurranse' : 'Ny konkurranse'}</h2>
@@ -82,6 +83,10 @@ function CompetitionsTab({ comps, reload }: { comps: Competition[]; reload: () =
             <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as CompetitionStatus })}>
               <option value="draft">Utkast (skjult)</option><option value="open">Åpen</option><option value="closed">Avsluttet (viser resultater)</option>
             </select>
+          </label>
+          <label className="toggle">
+            <input type="checkbox" checked={!!editing.live_board} onChange={(e) => setEditing({ ...editing, live_board: e.target.checked })} />
+            <span><strong>Live tavle</strong><br /><span className="soft small">Deltakerne ser snittscore per glass underveis, samlet og per kontor. Ingen navn, kommentarer eller fasit. Snitt vises først når minst 2 har svart. Tips: slå av hvis du vil unngå at tavlen påvirker stemmene.</span></span>
           </label>
           {err && <p className="error" role="alert">{err}</p>}
           <div className="row"><button className="btn">Lagre</button><button type="button" className="btn ghost" onClick={() => setEditing(null)}>Avbryt</button></div>

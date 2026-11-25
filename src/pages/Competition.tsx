@@ -100,6 +100,9 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
         <h1 style={{ margin: 0 }}>{comp.title}</h1>
         <StatusBadge status={comp.status} />
       </div>
+      {comp.live_board && comp.status === 'open' && (
+        <p style={{ margin: '0 0 10px' }}><Link className="btn gold small" to={`/k/${comp.slug}/tavle`}>📊 Se live tavle</Link></p>
+      )}
       {locked && (
         <div className="card-alt" role="status">
           <strong>{comp.status === 'closed' ? 'Konkurransen er avsluttet.' : 'Konkurransen er ikke åpen ennå.'}</strong> Svarene er låst.{' '}

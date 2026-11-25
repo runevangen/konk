@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Competition from './pages/Competition'
 import Results from './pages/Results'
+import Tavle from './pages/Tavle'
 import ProfilePage from './pages/Profile'
 import Admin from './pages/Admin'
 
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/registrer" element={<Register />} />
         <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
         <Route path="/k/:slug" element={<RequireAuth><Competition /></RequireAuth>} />
+        <Route path="/k/:slug/tavle" element={<RequireAuth><Tavle /></RequireAuth>} />
         <Route path="/k/:slug/resultat" element={<RequireAuth><Results /></RequireAuth>} />
         <Route path="/profil" element={<RequireAuth><ProfilePage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth admin><Admin /></RequireAuth>} />
