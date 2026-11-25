@@ -23,13 +23,13 @@ export async function updateProfile(userId: Id, patch: { display_name: string; a
   check(r)
 }
 export async function listCompetitions(includeDraft = false) {
-  let q = supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board').order('title')
+  let q = supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board,live_board_names').order('title')
   if (!includeDraft) q = q.neq('status', 'draft')
   return check(await q) as Competition[]
 }
 export async function getCompetition(slug: string) {
   return check(
-    await supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board').eq('slug', slug).maybeSingle(),
+    await supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board,live_board_names').eq('slug', slug).maybeSingle(),
   ) as Competition | null
 }
 export async function listItems(competitionId: Id) {
@@ -90,7 +90,7 @@ export async function deleteFeedback(id: Id) {
 }
 
 // ---- admin ----
-export async function saveCompetition(c: { id?: Id; slug: string; title: string; kind: string; status: CompetitionStatus; live_board: boolean }) {
+export async function saveCompetition(c: { id?: Id; slug: string; title: string; kind: string; status: CompetitionStatus; live_board: boolean; live_board_names: boolean }) {
   const { id, ...rest } = c
   if (id) check(await supabase.from('konk_competitions').update(rest).eq('id', id))
   else check(await supabase.from('konk_competitions').insert(rest))
