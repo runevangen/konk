@@ -44,6 +44,13 @@ function makeBackend(state) {
     const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) })
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } })
     state.calls.push(`${req.method()} ${p}${url.search}`)
+    if (p.endsWith('/functions/v1/konk-admin')) {
+      const b = req.postDataJSON()
+      state.adminCalls = state.adminCalls || []
+      state.adminCalls.push(b)
+      if (b.action === 'delete_user' && state.profileList) state.profileList = state.profileList.filter((x) => x.id !== b.user_id)
+      return json(b.action === 'reset_pin' ? { pin: '654123' } : { ok: true })
+    }
     if (p.endsWith('/functions/v1/konk-auth')) {
       const b = req.postDataJSON()
       if (b.action === 'change_pin') {
@@ -61,6 +68,7 @@ function makeBackend(state) {
     if (p.endsWith('/rest/v1/konk_offices')) return json([{ id: 'of1', name: 'Oslo' }, { id: 'of2', name: 'Stavanger' }])
     if (p.endsWith('/rest/v1/konk_profiles')) {
       if (req.method() === 'PATCH') { state.profilePatch = req.postDataJSON(); return json([]) }
+      if (state.profileList && !q.get('id')) return json(state.profileList)
       return single([{ id: UID, display_name: 'Kari Nordmann', office_id: 'of1', anonymous: false, is_admin: !!state.admin }])
     }
     if (p.endsWith('/rest/v1/konk_competitions')) {
@@ -398,6 +406,45 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await btn.click()
     await page.getByText(/Nullstilt: slettet/).waitFor()
     ok('admin: slett enkeltsvar, alle fra bruker og nullstill (krever SLETT)')
+    await ctx.close()
+  }
+
+  {
+    // --- Admin: brukere (sett pinkode, ny tilfeldig, slett) ---
+    const state = freshState({ admin: true })
+    state.profileList = [
+      { id: 'u1', display_name: 'Kari Nordmann', office_id: 'of1', anonymous: false, is_admin: true },
+      { id: 'u2', display_name: 'Ola Hansen', office_id: 'of2', anonymous: true, is_admin: false },
+    ]
+    const { ctx, page } = await newPage(browser, state)
+    page.on('dialog', (d) => d.accept())
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByRole('link', { name: 'Admin' }).click()
+    await page.getByRole('tab', { name: 'Brukere' }).click()
+    await page.getByText('Ola Hansen').waitFor()
+    await page.getByLabel('Søk').fill('ola')
+    await page.getByText('Ola Hansen').waitFor()
+    assert.strictEqual(await page.getByText('Kari Nordmann').count(), 0, 'søk filtrerer')
+    await page.getByLabel('Søk').fill('')
+    await page.getByRole('button', { name: 'Sett pinkode' }).nth(1).click()
+    await page.getByLabel(/Ny pinkode til Ola Hansen/).fill('123456')
+    await page.getByRole('button', { name: 'Lagre pinkode' }).click()
+    await page.getByText(/vanskeligere å gjette/).waitFor()
+    await page.getByLabel(/Ny pinkode til Ola Hansen/).fill('482915')
+    await page.getByRole('button', { name: 'Lagre pinkode' }).click()
+    await page.getByText('Ny pinkode er satt for Ola Hansen').waitFor()
+    assert.deepStrictEqual(state.adminCalls.at(-1), { action: 'set_pin', user_id: 'u2', pin: '482915' })
+    await shot(page, '12-admin-brukere')
+    await page.getByRole('button', { name: 'Ny tilfeldig' }).nth(1).click()
+    await page.getByTestId('reset-pin').waitFor()
+    assert.strictEqual(await page.getByTestId('reset-pin').innerText(), '654123')
+    await page.getByRole('button', { name: /Lukk/ }).click()
+    await page.getByRole('button', { name: 'Slett', exact: true }).last().click()
+    await page.getByText('Ola Hansen er slettet.').waitFor()
+    assert.deepStrictEqual(state.adminCalls.at(-1), { action: 'delete_user', user_id: 'u2' })
+    assert.strictEqual(await page.getByText('Ola Hansen', { exact: true }).count(), 0)
+    ok('admin: se brukere, søk, sett pinkode (svak avvist), ny tilfeldig og slett bruker')
     await ctx.close()
   }
 
