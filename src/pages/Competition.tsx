@@ -68,6 +68,9 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
     for (const [id, t] of Object.entries(timers.current)) { window.clearTimeout(t); delete timers.current[id]; persist(id) }
   }, [persist])
 
+  /** Lagre alt som venter, og vent til det er ferdig før vi navigerer (så oversikten viser siste versjon). */
+  const leave = useCallback(async (to: string) => { flushAll(); await chain.current; nav(to) }, [flushAll, nav])
+
   useEffect(() => {
     const onHide = () => { if (document.visibilityState === 'hidden') flushAll() }
     document.addEventListener('visibilitychange', onHide)
@@ -100,6 +103,9 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
         <h1 style={{ margin: 0 }}>{comp.title}</h1>
         <StatusBadge status={comp.status} />
       </div>
+      {done > 0 && (
+        <p style={{ margin: '0 0 10px' }}><button className="btn ghost-light small" onClick={() => void leave(`/k/${comp.slug}/mine`)}>📋 Mine svar</button></p>
+      )}
       {comp.live_board && comp.status === 'open' && (
         <p style={{ margin: '0 0 10px' }}><Link className="btn gold small" to={`/k/${comp.slug}/tavle`}>📊 Se live tavle</Link></p>
       )}
@@ -164,7 +170,7 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
         <div className="stepper-nav-inner">
           <button className="btn ghost-light" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>← Forrige</button>
           {last ? (
-            <button className="btn gold" onClick={() => { flushAll(); nav('/') }}>Ferdig</button>
+            <button className="btn gold" onClick={() => void leave(`/k/${comp.slug}/mine`)}>Ferdig – se svarene mine</button>
           ) : (
             <button className="btn gold" onClick={() => setIdx(idx + 1)}>Neste →</button>
           )}
