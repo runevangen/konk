@@ -987,6 +987,45 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await ctx.close()
   }
 
+  {
+    // --- Storskjerm: kode + QR i lobbyen, spørsmål uten fasit, fasit + topp 5, pallen ---
+    const base = { code: 'ABCD', theme: 'jul', n_questions: 2, seconds: 30, reveal_seconds: 7, is_host: true, is_player: false }
+    const pl = [{ name: 'Kari', office: 'Oslo', host: false, me: false }, { name: 'Ola', office: 'Stavanger', host: false, me: false }]
+    const rk = [{ name: 'Ola', office: 'Stavanger', points: 190, correct: 1, me: false }, { name: 'Kari', office: 'Oslo', points: 100, correct: 1, me: false }]
+    const of = [{ office: 'Oslo', players: 1, points: 100, avg: 100, correct: 1 }, { office: 'Stavanger', players: 1, points: 190, avg: 190, correct: 1 }]
+    const state = freshState({ admin: true })
+    state.qz = { calls: [], answers: [] }
+    state.qz.state = { ...base, status: 'lobby', players: pl }
+    const { ctx, page, errors } = await newPage(browser, state, { viewport: { width: 1280, height: 720 }, isMobile: false, hasTouch: false })
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/quiz/ABCD/skjerm')
+    await page.getByTestId('skjerm-kode').waitFor()
+    assert.strictEqual(await page.getByTestId('skjerm-kode').textContent(), 'ABCD')
+    await page.locator('[data-testid="skjerm-qr"] svg').waitFor()
+    assert.strictEqual(await page.getByTestId('skjerm-spillere').locator('li').count(), 2)
+    await shot(page, '35-skjerm-lobby')
+    state.qz.state = { ...base, status: 'playing', players: pl, nr: 0, phase: 'question', question: 'Hvem er størst?', options: ['A1', 'B1', 'C1', 'D1'], left_ms: 20000, n_answered: 1, n_players: 2 }
+    await page.getByTestId('skjerm-sporsmal').waitFor({ timeout: 5000 })
+    assert.strictEqual(await page.locator('[data-state="riktig"]').count(), 0)
+    await page.getByText('1 av 2 har svart').waitFor()
+    await shot(page, '36-skjerm-sporsmal')
+    state.qz.state = { ...base, status: 'playing', players: pl, nr: 0, phase: 'answer', question: 'Hvem er størst?', options: ['A1', 'B1', 'C1', 'D1'], left_ms: 5000, correct_index: 2, explanation: 'Fordi.', ranking: rk, offices: of }
+    await page.locator('[data-state="riktig"]').waitFor({ timeout: 5000 })
+    assert.ok(/C1/.test(await page.locator('[data-state="riktig"]').textContent()))
+    await page.getByText('Topp 5').waitFor()
+    await shot(page, '37-skjerm-fasit')
+    state.qz.state = { ...base, status: 'finished', players: pl, ranking: rk, offices: of }
+    await page.getByTestId('skjerm-pall').waitFor({ timeout: 5000 })
+    assert.ok(/Ola/.test(await page.getByTestId('skjerm-pall').locator('li').first().textContent()))
+    await shot(page, '38-skjerm-pall')
+    state.qz.state = { ...base, is_host: false, status: 'lobby', players: pl }
+    await page.getByText('Bare verten kan vise storskjerm').waitFor({ timeout: 5000 })
+    assert.deepStrictEqual(errors, [])
+    ok('storskjerm: kode og QR i lobbyen, spørsmål uten fasit, fasit med topp 5, pall, og nei for ikke-vert')
+    await ctx.close()
+  }
+
   // --- Reduced motion ---
   {
     const state = freshState()

@@ -220,3 +220,32 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .rank-gap { text-align: center; color: var(--ink-soft, #555); }
 .quiz-points { font: 700 1.6rem Georgia, serif; }
 @media (prefers-reduced-motion: reduce) { .countdown-fill { transition: none; } }
+
+/* Storskjerm (projektor) */
+.skjerm { max-width: 1200px; margin: 0 auto; padding: 8px 4px 40px; color: #fff; font-size: clamp(1.1rem, 2.2vw, 1.8rem); }
+.skjerm h1 { font-size: clamp(2rem, 5vw, 3.6rem); margin: .2em 0; }
+.skjerm h2 { font-size: clamp(1.3rem, 3vw, 2.2rem); }
+.skjerm-label { opacity: .85; margin: .3em 0; }
+.skjerm-lobby { display: flex; flex-wrap: wrap; gap: 32px; align-items: center; justify-content: space-between; }
+.skjerm-code { font: 700 clamp(4rem, 16vw, 11rem) Georgia, serif; letter-spacing: .2em; line-height: 1.1; background: #fff; color: var(--red); border: 4px dashed var(--border-strong); border-radius: 24px; padding: 8px 24px 8px 40px; }
+.skjerm-qr { background: #fff; padding: 12px; border-radius: 16px; width: min(260px, 40vw); }
+.skjerm-qr svg { width: 100%; height: auto; display: block; }
+.skjerm-spillere { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.skjerm-spillere li { background: #fff; color: #222; border-radius: 999px; padding: 6px 16px; font-weight: 600; }
+.skjerm-spm { margin: .5em 0 .6em; }
+.skjerm-valg { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.skjerm-opt { display: flex; gap: 14px; align-items: center; background: #fff; color: #222; border: 3px solid var(--border-strong); border-radius: 16px; padding: 16px 18px; font-weight: 600; }
+.skjerm-opt .letter { display: inline-grid; place-items: center; min-width: 2.2em; height: 2.2em; border-radius: 50%; background: var(--red); color: #fff; font-weight: 700; }
+.skjerm-opt.correct { border-color: var(--green); background: #e6f6e6; }
+.skjerm-opt.dim { opacity: .45; }
+.skjerm-forklaring { font-style: italic; }
+.skjerm-bunn { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.skjerm-pall { list-style: none; padding: 0; }
+.skjerm-pall li { display: flex; gap: 14px; align-items: baseline; background: #fff; color: #222; border-radius: 16px; padding: 14px 20px; margin: 10px 0; font-size: 1.3em; }
+.skjerm-medalje { font-size: 1.6em; }
+.skjerm-poeng { margin-left: auto; font-weight: 700; }
+.skjerm-alle { margin-top: 16px; }
+@media (max-width: 700px) { .skjerm-valg, .skjerm-bunn { grid-template-columns: 1fr; } }
+.skjerm .soft, .skjerm .small { color: rgba(255,255,255,.78); }
+.skjerm .skjerm-spillere .soft, .skjerm .skjerm-pall .soft { color: #555; }
+.skjerm .countdown { height: 22px; }
