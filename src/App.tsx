@@ -12,6 +12,9 @@ import Results from './pages/Results'
 import Tavle from './pages/Tavle'
 import ProfilePage from './pages/Profile'
 import Admin from './pages/Admin'
+import Quiz from './pages/quiz/Quiz'
+import QuizNew from './pages/quiz/QuizNew'
+import QuizRoom from './pages/quiz/QuizRoom'
 
 function RequireAuth({ children, admin = false }: { children: React.ReactElement; admin?: boolean }) {
   const { loading, session, profile } = useAuth()
@@ -34,6 +37,9 @@ export default function App() {
         <Route path="/k/:slug/tavle" element={<RequireAuth><Tavle /></RequireAuth>} />
         <Route path="/k/:slug/resultat" element={<RequireAuth><Results /></RequireAuth>} />
         <Route path="/profil" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+        <Route path="/quiz" element={<RequireAuth><Quiz /></RequireAuth>} />
+        <Route path="/quiz/ny" element={<RequireAuth><QuizNew /></RequireAuth>} />
+        <Route path="/quiz/:kode" element={<RequireAuth><QuizRoom /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth admin><Admin /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

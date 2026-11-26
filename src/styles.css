@@ -194,3 +194,29 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
   .live-dot, .bar-row.pulse { animation: none; }
   .bar > i { transition: none; }
 }
+
+/* Quiz */
+.quiz-code { font: 700 clamp(2.6rem, 14vw, 4.2rem) Georgia, serif; letter-spacing: .22em; text-align: center; background: #fff; color: var(--red); border: 3px dashed var(--border-strong); border-radius: 16px; padding: 14px 8px 14px 22px; margin: 8px 0 14px; user-select: all; }
+.quiz-opts { display: grid; gap: 10px; margin: 14px 0; }
+.quiz-opt { display: flex; align-items: center; gap: 12px; min-height: 64px; text-align: left; border-radius: 14px; border: 2px solid var(--border-strong); background: #fff; color: var(--ink); padding: 12px 14px; font: inherit; font-weight: 600; font-size: 1.05rem; cursor: pointer; width: 100%; }
+.quiz-opt .letter { width: 36px; height: 36px; border-radius: 50%; background: var(--card-alt); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex: none; }
+.quiz-opt[disabled] { cursor: default; }
+.quiz-opt.chosen { border-color: var(--gold); background: #fff4d2; }
+.quiz-opt.correct { background: var(--green); border-color: var(--green); color: #fff; }
+.quiz-opt.correct .letter { background: #fff; color: var(--green); }
+.quiz-opt.wrong { background: var(--red); border-color: var(--red); color: #fff; }
+.quiz-opt.wrong .letter { background: #fff; color: var(--red); }
+.quiz-opt.dim { opacity: .55; }
+.countdown { height: 16px; background: #fff; border: 1px solid var(--border-strong); border-radius: 999px; overflow: hidden; }
+.countdown-fill { height: 100%; background: var(--green); transition: width .25s linear; }
+.countdown-fill.low { background: var(--red); }
+.players { list-style: none; margin: 0; padding: 0; }
+.players li { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.rank-list { list-style: none; margin: 8px 0; padding: 0; }
+.rank-row { display: grid; grid-template-columns: 2.2rem 1fr auto; gap: 8px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+.rank-row.me { background: #fff4d2; border-radius: 8px; }
+.rank-row.big { font-size: 1.4rem; padding: 12px 8px; }
+.rank-n { text-align: center; font-weight: 700; }
+.rank-gap { text-align: center; color: var(--ink-soft, #555); }
+.quiz-points { font: 700 1.6rem Georgia, serif; }
+@media (prefers-reduced-motion: reduce) { .countdown-fill { transition: none; } }
