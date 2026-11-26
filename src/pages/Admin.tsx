@@ -99,7 +99,7 @@ function CompetitionsTab({ comps, reload, onReset }: { comps: Competition[]; rel
           {editing.live_board && (
             <label className="toggle">
               <input type="checkbox" checked={!!editing.live_board_names} onChange={(e) => setEditing({ ...editing, live_board_names: e.target.checked })} />
-              <span><strong>Vis brusnavn på live tavlen</strong><br /><span className="soft small">Viser hvilken brus som ligger hvor. <strong>Det røper fasiten</strong> for de som ikke har gjettet ferdig, så bruk det helst når alle har smakt ferdig. Navnene vises alltid når konkurransen er avsluttet.</span></span>
+              <span><strong>Vis navn på enhet på live tavlen</strong><br /><span className="soft small">Viser hvilken enhet som ligger hvor. <strong>Det røper fasiten</strong> for de som ikke har gjettet ferdig, så bruk det helst når alle har smakt ferdig. Navnene vises alltid når konkurransen er avsluttet.</span></span>
             </label>
           )}
           {err && <p className="error" role="alert">{err}</p>}
