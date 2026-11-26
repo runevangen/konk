@@ -128,6 +128,21 @@ function makeBackend(state) {
       if (req.method() === 'POST') { const b = req.postDataJSON(); state.saves.push(b); state.entries[b.item_id] = { id: 'e' + b.item_id, ...b }; return json([], 201) }
       return json(Object.values(state.entries))
     }
+    if (state.qz && p.includes('/rpc/konk_quiz_')) {
+      const Q = state.qz
+      const fn = p.split('/rpc/')[1]
+      const b = req.method() === 'POST' ? req.postDataJSON() : {}
+      Q.calls.push(fn + ' ' + JSON.stringify(b))
+      if (fn === 'konk_quiz_themes') return json([{ theme: 'jul', n: 30 }])
+      if (fn === 'konk_quiz_my_rooms') return json(Q.myRooms || [])
+      if (fn === 'konk_quiz_room_create') { Q.state = Q.lobby(); return json({ ok: true, code: 'ABCD' }) }
+      if (fn === 'konk_quiz_room_join') return json(b.p_code === 'ABCD' ? { ok: true, code: 'ABCD' } : { error: 'not_found' })
+      if (fn === 'konk_quiz_room_start') { Q.state = Q.question(); return json({ ok: true }) }
+      if (fn === 'konk_quiz_room_skip') { Q.state = Q.state.phase === 'question' ? Q.answer() : Q.finished(); return json({ ok: true }) }
+      if (fn === 'konk_quiz_room_answer') { Q.answers.push(b); Q.state = { ...Q.state, answered: true, n_answered: 2 }; return json({ ok: true }) }
+      if (fn === 'konk_quiz_room_close') { Q.closed = true; return json({ ok: true }) }
+      if (fn === 'konk_quiz_room_state') return json(Q.closed ? { error: 'not_found' } : Q.state)
+    }
     if (p.endsWith('/rpc/konk_my_progress')) return json(Object.keys(state.entries).length)
     if (p.endsWith('/rpc/konk_live_board')) {
       if (state.liveOff) return json({ message: 'live_off' }, 400)
@@ -881,6 +896,94 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
       if (w === 390) await shot(page, '20-toppraden')
     }
     ok('toppraden: «Konkurranser» passer ved 390, 360 og 320 px, med Admin-lenke')
+    await ctx.close()
+  }
+
+  {
+    // --- Quiz: spiller blir med med kode, svarer, ser fasit og sluttresultat ---
+    const base = { code: 'ABCD', theme: 'jul', n_questions: 2, seconds: 30, reveal_seconds: 7 }
+    const pl = [{ name: 'Kari', office: 'Oslo', host: false, me: true }, { name: 'Ola', office: 'Stavanger', host: false, me: false }]
+    const rk = [{ name: 'Ola', office: 'Stavanger', points: 190, correct: 1, me: false }, { name: 'Kari', office: 'Oslo', points: 100, correct: 1, me: true }]
+    const of = [{ office: 'Oslo', players: 1, points: 100, avg: 100, correct: 1 }, { office: 'Stavanger', players: 1, points: 190, avg: 190, correct: 1 }]
+    const state = freshState()
+    state.qz = { calls: [], answers: [] }
+    state.qz.lobby = () => ({ ...base, status: 'lobby', is_host: false, is_player: true, players: pl })
+    state.qz.question = () => ({ ...base, status: 'playing', is_host: false, is_player: true, players: pl, nr: 0, phase: 'question', question: 'Hvilket land kommer julenissen fra?', options: ['Norge', 'Finland', 'Island', 'Sverige'], left_ms: 20000, answered: false, n_answered: 1, n_players: 2 })
+    state.qz.answer = () => ({ ...base, status: 'playing', is_host: false, is_player: true, players: pl, nr: 0, phase: 'answer', question: 'Hvilket land kommer julenissen fra?', options: ['Norge', 'Finland', 'Island', 'Sverige'], left_ms: 6000, correct_index: 1, explanation: 'Mange mener Korvatunturi i Finland.', mine: { choice: 0, correct: false, points: 0 }, ranking: rk, offices: of, answered: true, n_answered: 2, n_players: 2 })
+    state.qz.finished = () => ({ ...base, status: 'finished', is_host: false, is_player: true, players: pl, ranking: rk, offices: of })
+    state.qz.state = state.qz.lobby()
+    const { ctx, page, errors } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByRole('link', { name: 'Bli med i quiz' }).click()
+    await page.getByLabel('Romkode').fill('xxxx')
+    await page.getByRole('button', { name: 'Bli med', exact: true }).click()
+    await page.getByText('Fant ikke noe rom med den koden.').waitFor()
+    await page.getByLabel('Romkode').fill('abcd')
+    await page.getByRole('button', { name: 'Bli med', exact: true }).click()
+    await page.getByTestId('quiz-kode').waitFor()
+    assert.strictEqual(await page.getByTestId('quiz-kode').textContent(), 'ABCD')
+    assert.strictEqual(await page.getByRole('button', { name: /Start quizen/ }).count(), 0)
+    await shot(page, '30-quiz-lobby')
+    state.qz.state = state.qz.question()
+    await page.getByTestId('quiz-sporsmal').waitFor({ timeout: 5000 })
+    await page.getByTestId('quiz-valg').nth(0).click()
+    await page.getByTestId('quiz-sendt').waitFor()
+    assert.deepStrictEqual(state.qz.answers[0], { p_code: 'ABCD', p_nr: 0, p_choice: 0 })
+    assert.ok(await page.getByTestId('quiz-valg').nth(1).isDisabled())
+    assert.ok(!/Finland/.test(await page.locator('[data-state="riktig"]').first().textContent().catch(() => '')))
+    await shot(page, '31-quiz-sporsmal')
+    state.qz.state = state.qz.answer()
+    await page.getByTestId('quiz-forklaring').waitFor({ timeout: 5000 })
+    assert.strictEqual(await page.locator('[data-state="riktig"]').textContent().then((t) => /Finland/.test(t)), true)
+    assert.strictEqual(await page.locator('[data-state="feil"]').count(), 1)
+    await page.getByTestId('quiz-rang').first().waitFor()
+    await shot(page, '32-quiz-fasit')
+    state.qz.state = state.qz.finished()
+    await page.getByTestId('quiz-ferdig').waitFor({ timeout: 5000 })
+    await page.getByText(/Du ble nr\./).waitFor()
+    for (const w of [390, 320]) {
+      await page.setViewportSize({ width: w, height: 800 })
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, `horisontal scroll i quiz ved ${w}px`)
+    }
+    await shot(page, '33-quiz-ferdig')
+    assert.deepStrictEqual(errors, [])
+    ok('quiz: spiller blir med med kode, svarer, ser fasit først etter svartiden og sluttresultat')
+    await ctx.close()
+  }
+  {
+    // --- Quiz: admin lager rom, starter, hopper videre og avslutter ---
+    const base = { code: 'ABCD', theme: 'jul', n_questions: 3, seconds: 30, reveal_seconds: 7, is_host: true, is_player: true }
+    const pl = [{ name: 'Kari', office: 'Oslo', host: true, me: true }, { name: 'Ola', office: 'Stavanger', host: false, me: false }]
+    const state = freshState({ admin: true })
+    state.qz = { calls: [], answers: [], myRooms: [{ code: 'WXYZ', status: 'lobby', theme: 'jul', created_at: '2026-12-01T10:00:00Z', players: 1 }] }
+    state.qz.lobby = () => ({ ...base, status: 'lobby', players: pl })
+    state.qz.question = () => ({ ...base, status: 'playing', players: pl, nr: 0, phase: 'question', question: 'Spørsmål?', options: ['A1', 'B1', 'C1', 'D1'], left_ms: 25000, answered: false, n_answered: 0, n_players: 2 })
+    state.qz.answer = () => ({ ...base, status: 'playing', players: pl, nr: 0, phase: 'answer', question: 'Spørsmål?', options: ['A1', 'B1', 'C1', 'D1'], left_ms: 6000, correct_index: 2, mine: { choice: -1, correct: false, points: 0 }, ranking: [], offices: [] })
+    state.qz.finished = () => ({ ...base, status: 'finished', players: pl, ranking: [], offices: [] })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('link', { name: 'Lag quiz-rom' }).first().click()
+    await page.getByRole('heading', { name: 'Nytt quiz-rom' }).waitFor()
+    await page.getByLabel('Antall spørsmål').fill('3')
+    await page.getByLabel('Tid per spørsmål').selectOption('30')
+    await page.getByRole('button', { name: 'Lag rom' }).click()
+    await page.getByTestId('quiz-kode').waitFor()
+    assert.ok(state.qz.calls.some((c) => c.startsWith('konk_quiz_room_create') && c.includes('"p_count":3') && c.includes('"p_host_plays":true')))
+    assert.ok(await page.getByRole('button', { name: 'Start quizen' }).isEnabled())
+    await page.getByRole('button', { name: 'Start quizen' }).click()
+    await page.getByTestId('quiz-sporsmal').waitFor({ timeout: 5000 })
+    await page.getByRole('button', { name: 'Vis fasit nå' }).click()
+    await page.getByTestId('quiz-resultat').waitFor({ timeout: 5000 })
+    await page.getByRole('button', { name: 'Hopp til neste' }).click()
+    await page.getByTestId('quiz-ferdig').waitFor({ timeout: 5000 })
+    await shot(page, '34-quiz-vert')
+    page.once('dialog', (d) => d.accept())
+    await page.getByRole('button', { name: /Avslutt og slett/ }).click()
+    await page.getByRole('heading', { name: 'Quiz', exact: true }).waitFor()
+    assert.ok(state.qz.closed)
+    await page.getByText('WXYZ').waitFor()
+    ok('quiz: admin lager rom, starter, viser fasit, hopper videre og avslutter')
     await ctx.close()
   }
 

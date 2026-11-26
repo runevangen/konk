@@ -21,6 +21,14 @@ export default function Home() {
   return (
     <>
       <h1>God jul{profile ? `, ${profile.display_name}` : ''}!</h1>
+      <div className="card">
+        <h2>🎯 Quiz</h2>
+        <p className="soft">Party-quiz med romkode: svar raskt og riktig mot kollegene.</p>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <Link className="btn gold" to="/quiz">Bli med i quiz</Link>
+          {profile?.is_admin && <Link className="btn ghost" to="/quiz/ny">Lag quiz-rom</Link>}
+        </div>
+      </div>
       <p className="muted-on-bg">Velg en konkurranse.</p>
       {loading && <Loading />}
       {error != null && <ErrorBox error={error} />}
