@@ -27,10 +27,10 @@ export function PlayersList({ players }: { players: QuizPlayer[] }) {
   )
 }
 
-export function RankList({ rows, limit, big = false }: { rows: RankRow[]; limit?: number; big?: boolean }) {
+export function RankList({ rows, limit, big = false, compact = false, hideMe = false }: { rows: RankRow[]; limit?: number; big?: boolean; compact?: boolean; hideMe?: boolean }) {
   const all = ranked(rows)
   const shown = limit ? all.slice(0, limit) : all
-  const meOut = limit ? all.find((r) => r.row.me && !shown.includes(r)) : undefined
+  const meOut = limit && !hideMe ? all.find((r) => r.row.me && !shown.includes(r)) : undefined
   const line = ({ rank, row }: { rank: number; row: RankRow }, k: string) => (
     <li key={k} className={`rank-row ${row.me ? 'me' : ''} ${big ? 'big' : ''}`} data-testid="quiz-rang">
       <span className="rank-n" aria-label={`Plass ${rank}`}>{medal(rank)}</span>
@@ -39,7 +39,7 @@ export function RankList({ rows, limit, big = false }: { rows: RankRow[]; limit?
     </li>
   )
   return (
-    <ol className="rank-list" aria-label="Rangering">
+    <ol className={`rank-list ${compact ? 'compact' : ''}`} aria-label="Rangering">
       {shown.map((r, i) => line(r, 'r' + i))}
       {meOut && (<><li className="rank-gap" aria-hidden="true">…</li>{line(meOut, 'me')}</>)}
     </ol>
