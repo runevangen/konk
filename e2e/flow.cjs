@@ -206,8 +206,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     const { ctx, page } = await newPage(browser, state)
     await page.goto(BASE + '/quiz?kode=ABCD'); await page.waitForURL('**/login'); await snap(page, 'A1-qr-skanning-lander-pa-innlogging')
     await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await snap(page, 'A2-navn-og-pin')
-    await page.getByRole('button', { name: 'Logg inn' }).click(); await page.getByLabel('Romkode').waitFor(); await snap(page, 'A3-romkoden-er-utfylt')
-    await page.getByRole('button', { name: 'Bli med', exact: true }).click(); await page.getByTestId('quiz-kode').waitFor(); await snap(page, 'A4-i-venterommet')
+    await page.getByRole('button', { name: 'Logg inn' }).click(); await page.getByTestId('quiz-kode').waitFor(); await snap(page, 'A3-rett-inn-i-venterommet')
     await ctx.close()
   }
   // B: ny bruker
@@ -218,9 +217,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('link', { name: 'Ny bruker' }).click(); await page.getByLabel('Navn', { exact: true }).waitFor()
     await page.getByLabel('Navn', { exact: true }).fill('Ny Kollega'); await page.getByLabel('Kontor').selectOption('of2'); await snap(page, 'B2-ny-bruker-navn-og-kontor')
     await page.getByRole('button', { name: 'Opprett bruker' }).click(); await page.getByTestId('pin').waitFor(); await snap(page, 'B3-pinkode-vises-en-gang')
-    await page.getByLabel('Jeg har lagret pinkoden').check(); await snap(page, 'B4-lagret-pinkoden')
-    await page.getByRole('button', { name: 'Fortsett til Konkurranser' }).click(); await page.getByLabel('Romkode').waitFor(); await snap(page, 'B5-romkoden-er-utfylt')
-    await page.getByRole('button', { name: 'Bli med', exact: true }).click(); await page.getByTestId('quiz-kode').waitFor(); await snap(page, 'B6-i-venterommet')
+    await page.getByRole('button', { name: 'Jeg har lagret koden – til quizen' }).click(); await page.getByTestId('quiz-kode').waitFor(); await snap(page, 'B4-rett-inn-i-venterommet')
     await ctx.close()
   }
   await browser.close(); console.log('ferdig')
