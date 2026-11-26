@@ -62,3 +62,8 @@ export interface LiveBoard {
   people: LivePerson[]
   people_min: number
 }
+
+export interface QuizQuestion {
+  id: Id; theme: string; category: string | null; difficulty: string | null; question: string
+  options: string[]; correct: number; explanation: string; source: string | null; hidden: boolean; created_at: string
+}

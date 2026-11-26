@@ -1,6 +1,7 @@
 import { ApiError, supabase } from './client'
+import type { QuizQuestionInput } from '../lib/quizImport'
 import type {
-  LiveBoard, Competition, CompetitionStatus, Entry, FeedbackRow, FeedbackTarget, GuessOption, Id, Item, MyFeedback, Office, Profile, Results,
+  QuizQuestion, LiveBoard, Competition, CompetitionStatus, Entry, FeedbackRow, FeedbackTarget, GuessOption, Id, Item, MyFeedback, Office, Profile, Results,
 } from './types'
 
 function check<T>(r: { data: T | null; error: { message: string } | null }): T {
@@ -170,4 +171,44 @@ export async function deleteAllAnswers(competitionId: Id, itemIds: Id[]) {
   if (!itemIds.length) return 0
   const r = await supabase.from('konk_entries').delete().in('item_id', itemIds).select('id')
   return (check(r) as { id: Id }[]).length
+}
+
+// ---- quiz: spørsmålsbank (kun admin; RLS) ----
+const QUIZ_COLS = 'id,theme,category,difficulty,question,options,correct,explanation,source,hidden,created_at'
+export async function listQuizQuestions() {
+  return check(await supabase.from('konk_quiz_questions').select(QUIZ_COLS).order('theme').order('created_at').order('id')) as QuizQuestion[]
+}
+const toRow = (q: QuizQuestionInput, userId: Id | null) => ({
+  theme: q.theme.trim(), category: q.category, difficulty: q.difficulty, question: q.question.trim(), options: q.options.map((o) => o.trim()),
+  correct: q.correct, explanation: q.explanation, source: q.source, created_by: userId,
+})
+/** Setter inn spørsmål i bunter. Feiler en bunt, prøves radene én og én, så vi kan si nøyaktig hvilke som ble avvist. */
+export async function insertQuizQuestions(items: { line: number; q: QuizQuestionInput }[], userId: Id | null) {
+  const failed: { line: number; message: string }[] = []
+  let inserted = 0
+  for (let i = 0; i < items.length; i += 50) {
+    const chunk = items.slice(i, i + 50)
+    const r = await supabase.from('konk_quiz_questions').insert(chunk.map((c) => toRow(c.q, userId)))
+    if (!r.error) { inserted += chunk.length; continue }
+    for (const c of chunk) {
+      const one = await supabase.from('konk_quiz_questions').insert(toRow(c.q, userId))
+      if (one.error) failed.push({ line: c.line, message: one.error.code === '23505' ? 'Finnes allerede i dette temaet.' : one.error.message })
+      else inserted++
+    }
+  }
+  return { inserted, failed }
+}
+export async function updateQuizQuestion(id: Id, q: QuizQuestionInput & { hidden: boolean }) {
+  const r = await supabase.from('konk_quiz_questions').update({
+    theme: q.theme.trim(), category: q.category, difficulty: q.difficulty, question: q.question.trim(), options: q.options.map((o) => o.trim()),
+    correct: q.correct, explanation: q.explanation, source: q.source, hidden: q.hidden,
+  }).eq('id', id)
+  if (r.error?.code === '23505') throw new ApiError('db', 0, 'Dette spørsmålet finnes allerede i temaet.')
+  check(r)
+}
+export async function setQuizHidden(ids: Id[], hidden: boolean) {
+  if (ids.length) check(await supabase.from('konk_quiz_questions').update({ hidden }).in('id', ids))
+}
+export async function deleteQuizQuestions(ids: Id[]) {
+  if (ids.length) check(await supabase.from('konk_quiz_questions').delete().in('id', ids))
 }
