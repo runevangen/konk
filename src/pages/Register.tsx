@@ -67,7 +67,7 @@ export default function Register() {
           <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
           <span>Jeg har lagret pinkoden</span>
         </label>
-        <button className="btn block" disabled={!saved} onClick={done}>Fortsett til Konk</button>
+        <button className="btn block" disabled={!saved} onClick={done}>Fortsett til Konkurranser</button>
       </div>
     )
   }

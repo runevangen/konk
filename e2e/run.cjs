@@ -185,10 +185,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByTestId('pin').waitFor()
     assert.strictEqual(await page.getByTestId('pin').innerText(), '482915')
     assert.strictEqual(state.registered.anonymous, false)
-    assert.strictEqual(await page.getByRole('button', { name: 'Fortsett til Konk' }).isDisabled(), true)
+    assert.strictEqual(await page.getByRole('button', { name: 'Fortsett til Konkurranser' }).isDisabled(), true)
     await shot(page, '02-registrer-pin')
     await page.getByLabel('Jeg har lagret pinkoden').check()
-    await page.getByRole('button', { name: 'Fortsett til Konk' }).click()
+    await page.getByRole('button', { name: 'Fortsett til Konkurranser' }).click()
     await page.waitForURL(BASE + '/')
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
     // pin skal være borte fra DOM, storage og URL
@@ -744,6 +744,26 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByText('Lagret 2 glass.').waitFor()
     assert.deepStrictEqual(G.items.map((i) => [i.id, i.position]).sort(), [['g1', 2], ['g2', 1], ['g3', 3]])
     ok('admin: glass og fasit som tabell: lagre alle, skjul fasit, fasitliste, lim inn liste og slett')
+    await ctx.close()
+  }
+
+  {
+    // --- Toppraden med navnet «Konkurranser» passer på smale skjermer (også med Admin-lenke) ---
+    const state = freshState({ admin: true })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    assert.strictEqual(await page.title(), 'Konkurranser')
+    await page.getByRole('link', { name: /Konkurranser/ }).first().waitFor()
+    for (const w of [390, 360, 320]) {
+      await page.setViewportSize({ width: w, height: 800 })
+      const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+      assert.ok(over <= 0, `horisontal scroll i toppraden ved ${w}px: ${over}`)
+      const hdr = await page.locator('.app-header').boundingBox()
+      assert.ok(hdr.height < (w >= 360 ? 100 : 130), `toppraden er for høy ved ${w}px: ${hdr.height}`)
+      if (w === 390) await shot(page, '20-toppraden')
+    }
+    ok('toppraden: «Konkurranser» passer ved 390, 360 og 320 px, med Admin-lenke')
     await ctx.close()
   }
 
