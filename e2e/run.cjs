@@ -925,8 +925,14 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.strictEqual(await page.getByTestId('quiz-kode').textContent(), 'ABCD')
     assert.strictEqual(await page.getByRole('button', { name: /Start quizen/ }).count(), 0)
     await shot(page, '30-quiz-lobby')
+    state.qz.state = { ...state.qz.question(), phase: 'countdown', left_ms: 8000, question: undefined, options: undefined, answered: undefined }
+    await page.getByTestId('quiz-nedtelling').waitFor({ timeout: 5000 })
+    assert.strictEqual(await page.getByTestId('quiz-sporsmal').count(), 0, 'ingen spørsmål under nedtellingen')
+    assert.ok(Number(await page.getByTestId('quiz-nedtelling-tall').textContent()) <= 8)
+    await shot(page, '39-quiz-nedtelling')
     state.qz.state = state.qz.question()
     await page.getByTestId('quiz-sporsmal').waitFor({ timeout: 5000 })
+    assert.strictEqual(await page.getByTestId('quiz-nedtelling').count(), 0)
     await page.getByTestId('quiz-valg').nth(0).click()
     await page.getByTestId('quiz-sendt').waitFor()
     assert.deepStrictEqual(state.qz.answers[0], { p_code: 'ABCD', p_nr: 0, p_choice: 0 })
@@ -1005,6 +1011,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.locator('[data-testid="skjerm-qr"] svg').waitFor()
     assert.strictEqual(await page.getByTestId('skjerm-spillere').locator('li').count(), 2)
     await shot(page, '35-skjerm-lobby'); assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, 'storskjermen må passe på 1280x720 uten rulling: 35-skjerm-lobby')
+    state.qz.state = { ...base, status: 'playing', players: pl, nr: 0, phase: 'countdown', left_ms: 9000 }
+    await page.getByTestId('quiz-nedtelling').waitFor({ timeout: 5000 })
+    assert.strictEqual(await page.getByTestId('skjerm-sporsmal').count(), 0)
+    await shot(page, '40-skjerm-nedtelling'); assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, 'nedtellingen passer på 1280x720')
     state.qz.state = { ...base, status: 'playing', players: pl, nr: 0, phase: 'question', question: 'Hvem er størst?', options: ['A1', 'B1', 'C1', 'D1'], left_ms: 20000, n_answered: 1, n_players: 2 }
     await page.getByTestId('skjerm-sporsmal').waitFor({ timeout: 5000 })
     assert.strictEqual(await page.locator('[data-state="riktig"]').count(), 0)

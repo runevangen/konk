@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { errorMessage } from '../../api/functions'
 import { Loading } from '../../components/ui'
-import { Countdown, LETTERS, OfficeBoard, RankList } from '../../components/quiz/parts'
+import { Countdown, GiftCountdown, LETTERS, OfficeBoard, RankList } from '../../components/quiz/parts'
 import { isCode, isOfficeTie, normalizeCode, officeWinner, ranked } from '../../lib/quiz'
 import { useQuizRoom } from './useQuizRoom'
 
@@ -57,6 +57,10 @@ export default function QuizSkjerm() {
         </ul>
       </>,
     )
+  }
+
+  if (state.status === 'playing' && state.phase === 'countdown') {
+    return wrap(<><h1>Gjør dere klare!</h1><GiftCountdown remaining={remaining} big /></>)
   }
 
   if (state.status === 'playing') {

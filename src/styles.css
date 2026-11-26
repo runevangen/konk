@@ -278,3 +278,23 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .skjerm .office-board.big { font-size: .8em; }
 .skjerm .office-board.big * { margin-top: 0; margin-bottom: 2px; }
 .skjerm-vinner { font-size: 1.5em; }
+
+/* Nedtelling: gavepakken */
+.gift-wrap { display: grid; place-items: center; text-align: center; padding: 6px 0 4px; }
+.gift-stack { position: relative; display: grid; place-items: center; width: 200px; height: 200px; }
+.gift-ring { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(var(--gold, #e8b84a) var(--p, 360deg), rgba(0,0,0,.12) 0); }
+.gift-ring::after { content: ""; position: absolute; inset: 14px; border-radius: 50%; background: var(--card, #fdf8ea); }
+.gift-emoji { position: relative; z-index: 1; font-size: 5.5rem; line-height: 1; }
+.gift-emoji.shake { animation: gift-shake .35s infinite; }
+.gift-num { font: 700 4.5rem Georgia, serif; line-height: 1; color: var(--red); animation: gift-pop 1s ease-out; }
+.gift-num.last { color: var(--green); font-size: 6rem; }
+.gift-label { margin: 6px 0 0; font-weight: 600; }
+.gift-wrap.big .gift-stack { width: min(46vh, 380px); height: min(46vh, 380px); }
+.gift-wrap.big .gift-emoji { font-size: min(24vh, 200px); }
+.gift-wrap.big .gift-num { font-size: min(18vh, 150px); color: #fff; }
+.gift-wrap.big .gift-num.last { color: var(--gold, #e8b84a); font-size: min(22vh, 180px); }
+.gift-wrap.big .gift-ring::after { background: #12402a; }
+.gift-wrap.big .gift-label { font-size: 1.6rem; color: #fff; }
+@keyframes gift-shake { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes gift-pop { 0% { transform: scale(1.6); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .gift-emoji.shake, .gift-num { animation: none; } }
