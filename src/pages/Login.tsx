@@ -46,7 +46,7 @@ export default function Login() {
       </form>
       <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '18px 0' }} />
       <p className="soft" style={{ marginBottom: 8 }}>Første gang her?</p>
-      <Link className="btn green block" to="/registrer">Ny bruker</Link>
+      <Link className="btn green block" to="/registrer" state={{ from }}>Ny bruker</Link>
     </div>
   )
 }

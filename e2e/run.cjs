@@ -1036,6 +1036,25 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await ctx.close()
   }
 
+  {
+    // --- Ny bruker via quiz-QR: romkoden overlever innlogging -> registrering -> pin ---
+    const state = freshState()
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/quiz?kode=ABCD')
+    await page.waitForURL('**/login')
+    await page.getByRole('link', { name: 'Ny bruker' }).click()
+    await page.getByLabel('Navn', { exact: true }).fill('Ny Kollega')
+    await page.getByLabel('Kontor').selectOption('of2')
+    await page.getByRole('button', { name: 'Opprett bruker' }).click()
+    await page.getByTestId('pin').waitFor()
+    await page.getByLabel('Jeg har lagret pinkoden').check()
+    await page.getByRole('button', { name: 'Fortsett til Konkurranser' }).click()
+    await page.waitForURL(BASE + '/quiz?kode=ABCD')
+    assert.strictEqual(await page.getByLabel('Romkode').inputValue(), 'ABCD')
+    ok('ny bruker via quiz-lenke: romkoden er ferdig utfylt etter registrering')
+    await ctx.close()
+  }
+
   // --- Reduced motion ---
   {
     const state = freshState()
