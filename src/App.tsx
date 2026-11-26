@@ -15,6 +15,7 @@ import Admin from './pages/Admin'
 import Quiz from './pages/quiz/Quiz'
 import QuizNew from './pages/quiz/QuizNew'
 import QuizRoom from './pages/quiz/QuizRoom'
+import QuizSkjerm from './pages/quiz/QuizSkjerm'
 
 function RequireAuth({ children, admin = false }: { children: React.ReactElement; admin?: boolean }) {
   const { loading, session, profile } = useAuth()
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/profil" element={<RequireAuth><ProfilePage /></RequireAuth>} />
         <Route path="/quiz" element={<RequireAuth><Quiz /></RequireAuth>} />
         <Route path="/quiz/ny" element={<RequireAuth><QuizNew /></RequireAuth>} />
+        <Route path="/quiz/:kode/skjerm" element={<RequireAuth><QuizSkjerm /></RequireAuth>} />
         <Route path="/quiz/:kode" element={<RequireAuth><QuizRoom /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth admin><Admin /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
