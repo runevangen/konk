@@ -11,17 +11,20 @@ type Run = (f: () => Promise<unknown>) => Promise<void>
 interface Form {
   id: Id | null; theme: string; category: string; difficulty: string; question: string
   options: [string, string, string, string]; correct: number; explanation: string; source: string; hidden: boolean
+  sourceLevel: string; reviewStatus: '' | 'ok' | 'usikker'; reviewNote: string
 }
-const emptyForm = (theme: string): Form => ({ id: null, theme, category: '', difficulty: '', question: '', options: ['', '', '', ''], correct: 0, explanation: '', source: '', hidden: false })
+const emptyForm = (theme: string): Form => ({ id: null, theme, category: '', difficulty: '', question: '', options: ['', '', '', ''], correct: 0, explanation: '', source: '', hidden: false, sourceLevel: '', reviewStatus: '', reviewNote: '' })
 const toForm = (q: QuizQuestion): Form => ({
   id: q.id, theme: q.theme, category: q.category ?? '', difficulty: q.difficulty ?? '', question: q.question,
   options: [q.options[0] ?? '', q.options[1] ?? '', q.options[2] ?? '', q.options[3] ?? ''], correct: q.correct,
   explanation: q.explanation, source: q.source ?? '', hidden: q.hidden,
+  sourceLevel: q.source_level ? String(q.source_level) : '', reviewStatus: q.review_status ?? '', reviewNote: q.review_note ?? '',
 })
 const toInput = (f: Form): QuizQuestionInput => ({
   theme: f.theme.trim(), category: f.category.trim() || null, difficulty: f.difficulty.trim() || null, question: f.question.trim(),
   options: f.options.map((o) => o.trim()) as [string, string, string, string], correct: f.correct as 0 | 1 | 2 | 3,
   explanation: f.explanation.trim(), source: f.source.trim() || null,
+  sourceLevel: f.sourceLevel ? Number(f.sourceLevel) : null, reviewStatus: f.reviewStatus || null, reviewNote: f.reviewNote.trim() || null,
 })
 
 /** Spørsmålsbanken til quizen: liste, søk, redigering, import (JSON/CSV) og eksport. */
@@ -33,6 +36,8 @@ export default function QuizBank({ run }: { run: Run }) {
   const [fTheme, setFTheme] = useState('')
   const [fCat, setFCat] = useState('')
   const [fHidden, setFHidden] = useState<'alle' | 'synlige' | 'skjulte'>('alle')
+  const [fQuality, setFQuality] = useState<'alle' | 'ok' | 'usikker'>('alle')
+  const [hideUnsure, setHideUnsure] = useState(true)
   const [msg, setMsg] = useState<string | null>(null)
   const [form, setForm] = useState<Form | null>(null)
   const [formErr, setFormErr] = useState<string[]>([])
@@ -44,7 +49,7 @@ export default function QuizBank({ run }: { run: Run }) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const all = data.data
-  useEffect(() => { setMsg(null) }, [q, fTheme, fCat, fHidden])
+  useEffect(() => { setMsg(null) }, [q, fTheme, fCat, fHidden, fQuality])
 
   const themes = useMemo(() => [...new Set((all ?? []).map((x) => x.theme))].sort(), [all])
   const cats = useMemo(() => [...new Set((all ?? []).map((x) => x.category).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, 'nb')), [all])
@@ -60,21 +65,23 @@ export default function QuizBank({ run }: { run: Run }) {
   const needle = q.trim().toLowerCase()
   const shown = all.filter((x) =>
     (!fTheme || x.theme === fTheme) && (!fCat || x.category === fCat) &&
-    (fHidden === 'alle' || (fHidden === 'skjulte') === x.hidden) &&
+    (fHidden === 'alle' || (fHidden === 'skjulte') === x.hidden) && (fQuality === 'alle' || x.review_status === fQuality) &&
     (!needle || x.question.toLowerCase().includes(needle) || x.options.some((o) => o.toLowerCase().includes(needle)) || (x.category ?? '').toLowerCase().includes(needle)))
   const visible = all.filter((x) => !x.hidden).length
 
   const good = importable(parsed.rows)
   const bad = parsed.rows.filter((r) => r.errors.length)
   const dupes = parsed.rows.filter((r) => r.duplicate)
+  const unsure = good.filter((r) => r.question?.reviewStatus === 'usikker')
 
   async function doImport() {
     if (!good.length) return
     setBusy(true); setMsg(null)
     await run(async () => {
-      const res = await insertQuizQuestions(good.map((r) => ({ line: r.line, q: r.question! })), userId)
+      const res = await insertQuizQuestions(good.map((r) => ({ line: r.line, q: r.question!, hidden: hideUnsure && r.question!.reviewStatus === 'usikker' })), userId)
       const extra = res.failed.length ? ` ${res.failed.length} ble avvist: ${res.failed.map((f) => `rad ${f.line} (${f.message})`).join('; ')}.` : ''
-      setMsg(`Importerte ${res.inserted} spørsmål.${extra}`)
+      const hiddenN = hideUnsure ? unsure.length : 0
+      setMsg(`Importerte ${res.inserted} spørsmål${hiddenN ? ` (${hiddenN} usikre er skjult)` : ''}.${extra}`)
       if (!res.failed.length) { setText(''); setShowImport(false) }
       await data.reload()
     })
@@ -156,6 +163,7 @@ export default function QuizBank({ run }: { run: Run }) {
         <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
           <label className="small">Tema<br /><select aria-label="Filter tema" value={fTheme} onChange={(e) => setFTheme(e.target.value)}><option value="">Alle</option>{themes.map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
           <label className="small">Kategori<br /><select aria-label="Filter kategori" value={fCat} onChange={(e) => setFCat(e.target.value)}><option value="">Alle</option>{cats.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+           <label className="small">Kvalitet<br /><select aria-label="Filter kvalitet" value={fQuality} onChange={(e) => setFQuality(e.target.value as typeof fQuality)}><option value="alle">Alle</option><option value="ok">OK</option><option value="usikker">Usikre</option></select></label>
           <label className="small">Vis<br /><select aria-label="Filter skjult" value={fHidden} onChange={(e) => setFHidden(e.target.value as typeof fHidden)}><option value="alle">Alle</option><option value="synlige">Synlige</option><option value="skjulte">Skjulte</option></select></label>
         </div>
       </div>
@@ -178,13 +186,20 @@ export default function QuizBank({ run }: { run: Run }) {
               <p style={{ margin: '12px 0 6px' }} data-testid="import-oppsummering">
                 <strong>{good.length}</strong> kan importeres{bad.length ? <> · <span className="error">{bad.length} med feil</span></> : null}{dupes.length ? <> · {dupes.length} dubletter hoppes over</> : null}
               </p>
+              {unsure.length > 0 && (
+                <label className="toggle">
+                  <input type="checkbox" checked={hideUnsure} onChange={(e) => setHideUnsure(e.target.checked)} />
+                  <span><strong>Skjul de {unsure.length} spørsmålene som er merket Usikker (anbefalt)</strong><br />
+                    <span className="soft small">Skjulte spørsmål brukes ikke i en runde. Du kan se på dem og vise dem etterpå.</span></span>
+                </label>
+              )}
               <table className="t" aria-label="Forhåndsvisning av import">
                 <thead><tr><th>Rad</th><th>Spørsmål</th><th>Status</th></tr></thead>
                 <tbody>
                   {parsed.rows.map((r) => (
                     <tr key={r.line} data-testid="import-rad" data-status={r.errors.length ? 'feil' : r.duplicate ? 'dublett' : 'ok'}>
                       <td>{r.line}</td>
-                      <td>{r.label}{r.question && <div className="soft small">{[r.question.category, r.question.difficulty].filter(Boolean).join(' · ')} · riktig {LETTERS[r.question.correct]}: {r.question.options[r.question.correct]}</div>}</td>
+                      <td>{r.label}{r.question && <div className="soft small">{[r.question.category, r.question.difficulty].filter(Boolean).join(' · ')} · riktig {LETTERS[r.question.correct]}: {r.question.options[r.question.correct]}{r.question.reviewStatus === 'usikker' ? ' · USIKKER' : ''}</div>}</td>
                       <td className="small">
                         {r.errors.length ? <span className="error">{r.errors.map((e, i) => <div key={i}>{e}</div>)}</span>
                           : r.duplicate ? <span>{r.duplicate === 'bank' ? 'Finnes i banken' : 'Dublett i filen'}</span> : <span>OK</span>}
@@ -224,6 +239,12 @@ export default function QuizBank({ run }: { run: Run }) {
           <label className="field" htmlFor="qf-kilde">Kilde (valgfri)</label>
           <input id="qf-kilde" type="text" value={form.source} maxLength={300} onChange={(e) => setForm({ ...form, source: e.target.value })} />
           <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            <label className="small">Kildenivå<br /><select aria-label="Kildenivå" value={form.sourceLevel} onChange={(e) => setForm({ ...form, sourceLevel: e.target.value })}><option value="">–</option>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+            <label className="small">Status<br /><select aria-label="Status" value={form.reviewStatus} onChange={(e) => setForm({ ...form, reviewStatus: e.target.value as Form['reviewStatus'] })}><option value="">–</option><option value="ok">OK</option><option value="usikker">Usikker</option></select></label>
+          </div>
+          <label className="field" htmlFor="qf-merknad" style={{ marginTop: 8 }}>Merknad (valgfri)</label>
+          <textarea id="qf-merknad" value={form.reviewNote} maxLength={600} onChange={(e) => setForm({ ...form, reviewNote: e.target.value })} />
+          <div className="row" style={{ flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
             <label className="small">Tema<br /><input type="text" list="quiz-temaer" value={form.theme} maxLength={40} onChange={(e) => setForm({ ...form, theme: e.target.value })} aria-label="Tema" /></label>
             <label className="small">Kategori<br /><input type="text" value={form.category} maxLength={40} onChange={(e) => setForm({ ...form, category: e.target.value })} aria-label="Kategori" /></label>
             <label className="small">Vanskelighet<br /><select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })} aria-label="Vanskelighet"><option value="">–</option><option>Lett</option><option>Middels</option><option>Vanskelig</option></select></label>
@@ -258,7 +279,7 @@ export default function QuizBank({ run }: { run: Run }) {
           <div key={x.id} data-testid="quiz-rad" style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
             <div className="row between" style={{ alignItems: 'flex-start', gap: 8 }}>
               <button className="btn ghost small" style={{ textAlign: 'left', flex: 1, justifyContent: 'flex-start', height: 'auto', padding: '8px 12px' }} aria-expanded={open === x.id} onClick={() => setOpen(open === x.id ? null : x.id)}>
-                <span><strong>{x.question}</strong>{x.hidden && <span className="soft small"> · skjult</span>}
+                <span><strong>{x.question}</strong>{x.review_status === 'usikker' && <span className="error small"> · usikker</span>}{x.hidden && <span className="soft small"> · skjult</span>}
                   <span className="soft small" style={{ display: 'block' }}>{[x.theme, x.category, x.difficulty].filter(Boolean).join(' · ')}</span></span>
               </button>
             </div>
@@ -270,7 +291,8 @@ export default function QuizBank({ run }: { run: Run }) {
                   ))}
                 </ol>
                 {x.explanation && <p className="soft small" style={{ margin: '8px 0 0' }}>{x.explanation}</p>}
-                {x.source && <p className="soft small" style={{ margin: '4px 0 0', wordBreak: 'break-all' }}>Kilde: {x.source}</p>}
+                {x.source && <p className="soft small" style={{ margin: '4px 0 0', wordBreak: 'break-all' }}>Kilde{x.source_level ? ` (nivå ${x.source_level})` : ''}: {x.source}</p>}
+                {x.review_note && <p className={x.review_status === 'usikker' ? 'error small' : 'soft small'} style={{ margin: '4px 0 0' }}>Merknad: {x.review_note}</p>}
                 <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                   <button className="btn small" disabled={busy} onClick={() => { setForm(toForm(x)); setFormErr([]); setShowImport(false); window.scrollTo({ top: 0 }) }}>Rediger</button>
                   <button className="btn ghost small" disabled={busy} onClick={() => void toggleHidden(x)}>{x.hidden ? 'Vis' : 'Skjul'}</button>

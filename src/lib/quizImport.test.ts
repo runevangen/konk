@@ -84,6 +84,33 @@ describe('parseQuizText: CSV', () => {
   })
 })
 
+describe('kvalitetssikring: kildenivå, status og merknad', () => {
+  it('leser kilde_nivaa, status og merknad fra JSON', () => {
+    const r = parseQuizText(JSON.stringify([
+      Q(1, { kilde_nivaa: 2, status: 'OK', merknad: '' }),
+      Q(2, { kilde_nivaa: 3, status: 'Usikker', merknad: 'Bygger på andres forskning.', kilde: 'https://a.no | https://b.no' }),
+      Q(3),
+    ]), 'jul')
+    expect(r.rows.map((x) => [x.question?.sourceLevel, x.question?.reviewStatus, x.question?.reviewNote])).toEqual([[2, 'ok', null], [3, 'usikker', 'Bygger på andres forskning.'], [null, null, null]])
+    expect(r.rows[1].question?.source).toBe('https://a.no | https://b.no')
+  })
+  it('avviser ukjent status og ugyldig kildenivå', () => {
+    const r = parseQuizText(JSON.stringify([Q(1, { status: 'Kanskje' }), Q(2, { kilde_nivaa: 9 }), Q(3, { kilde_nivaa: 'x' })]), 'jul')
+    expect(r.rows[0].errors.join(' ')).toContain('Ukjent status')
+    expect(r.rows[1].errors.join(' ')).toContain('Kildenivå')
+    expect(r.rows[2].errors.join(' ')).toContain('Kildenivå')
+  })
+  it('leser kolonnene fra CSV', () => {
+    const csv = 'spørsmål;A;B;C;D;riktig;kildenivå;status;merknad\nEn?;a;b;c;d;A;1;Usikker;Se kilden'
+    expect(parseQuizText(csv, 'jul').rows[0].question).toMatchObject({ sourceLevel: 1, reviewStatus: 'usikker', reviewNote: 'Se kilden' })
+  })
+  it('eksporten tar med feltene og kan leses inn igjen', () => {
+    const r = parseQuizText(JSON.stringify([Q(1, { kilde_nivaa: 2, status: 'Usikker', merknad: 'Mangler rotkilde' })]), 'jul')
+    const again = parseQuizText(toExportJson(r.rows.map((x) => x.question!)), 'jul')
+    expect(again.rows[0].question).toMatchObject({ sourceLevel: 2, reviewStatus: 'usikker', reviewNote: 'Mangler rotkilde' })
+  })
+})
+
 describe('parseQuizText: andre tilfeller', () => {
   it('tom tekst og ukjent format', () => {
     expect(parseQuizText('  \n', 'jul').format).toBe('tom')

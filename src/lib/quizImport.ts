@@ -9,6 +9,9 @@ export interface QuizQuestionInput {
   correct: 0 | 1 | 2 | 3
   explanation: string
   source: string | null
+  sourceLevel: number | null          // 1 = beste kilde … 5 = svakeste
+  reviewStatus: 'ok' | 'usikker' | null
+  reviewNote: string | null
 }
 
 export interface ParsedRow {
@@ -25,7 +28,7 @@ export interface ParseResult {
   fatal: string | null
 }
 
-export const LIMITS = { question: [3, 300], option: 120, explanation: 500, source: 300, category: 40, difficulty: 20, theme: 40 } as const
+export const LIMITS = { question: [3, 300], option: 120, explanation: 500, source: 300, category: 40, difficulty: 20, theme: 40, note: 600 } as const
 export const LETTERS = ['A', 'B', 'C', 'D'] as const
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '').normalize('NFC').trim()
@@ -73,12 +76,14 @@ export function validateQuestion(q: Partial<QuizQuestionInput> & { options?: str
   if ((q.source ?? '').length > LIMITS.source) e.push(`Kilden er for lang (maks ${LIMITS.source} tegn).`)
   if ((q.category ?? '').length > LIMITS.category) e.push(`Kategorien er for lang (maks ${LIMITS.category} tegn).`)
   if ((q.difficulty ?? '').length > LIMITS.difficulty) e.push(`Vanskeligheten er for lang (maks ${LIMITS.difficulty} tegn).`)
+  if (q.sourceLevel !== undefined && q.sourceLevel !== null && !(Number.isInteger(q.sourceLevel) && q.sourceLevel >= 1 && q.sourceLevel <= 5)) e.push('Kildenivå må være et tall fra 1 til 5.')
+  if ((q.reviewNote ?? '').length > LIMITS.note) e.push(`Merknaden er for lang (maks ${LIMITS.note} tegn).`)
   const theme = (q.theme ?? '').trim()
   if (!theme || theme.length > LIMITS.theme) e.push(`Temaet må være 1–${LIMITS.theme} tegn.`)
   return e
 }
 
-function build(raw: { theme?: unknown; category?: unknown; difficulty?: unknown; question?: unknown; options: unknown[]; correct?: unknown; explanation?: unknown; source?: unknown }, defaultTheme: string, line: number): ParsedRow {
+function build(raw: { theme?: unknown; category?: unknown; difficulty?: unknown; question?: unknown; options: unknown[]; correct?: unknown; explanation?: unknown; source?: unknown; sourceLevel?: unknown; status?: unknown; note?: unknown }, defaultTheme: string, line: number): ParsedRow {
   const options = raw.options.map(str)
   const correct = options.length === 4 ? parseCorrect(raw.correct, options) : null
   const q = {
@@ -90,8 +95,17 @@ function build(raw: { theme?: unknown; category?: unknown; difficulty?: unknown;
     correct: (correct ?? undefined) as 0 | 1 | 2 | 3 | undefined,
     explanation: str(raw.explanation),
     source: str(raw.source) || null,
+    sourceLevel: null as number | null,
+    reviewStatus: null as 'ok' | 'usikker' | null,
+    reviewNote: str(raw.note) || null,
   }
-  const errors = validateQuestion(q)
+  const errors: string[] = []
+  const lvl = str(raw.sourceLevel)
+  if (lvl) { const n = Number(lvl); if (Number.isInteger(n)) q.sourceLevel = n; else errors.push('Kildenivå må være et tall fra 1 til 5.') }
+  const st = str(raw.status).toLowerCase()
+  if (st === 'ok' || st === 'usikker') q.reviewStatus = st
+  else if (st) errors.push(`Ukjent status «${str(raw.status)}». Bruk OK eller Usikker.`)
+  errors.push(...validateQuestion(q))
   const label = q.question ? (q.question.length > 70 ? q.question.slice(0, 67) + '…' : q.question) : '(uten spørsmål)'
   return { line, label, errors, duplicate: null, question: errors.length ? null : (q as QuizQuestionInput) }
 }
@@ -127,6 +141,9 @@ function parseJson(text: string, defaultTheme: string): ParseResult {
       correct: pick(o, ['riktig', 'correct', 'fasit']),
       explanation: pick(o, ['forklaring', 'explanation']),
       source: pick(o, ['kilde', 'source']),
+      sourceLevel: pick(o, ['kilde_nivaa', 'kilde_nivå', 'kildenivaa', 'kildenivå', 'source_level']),
+      status: pick(o, ['status', 'review_status']),
+      note: pick(o, ['merknad', 'review_note', 'note']),
     }, defaultTheme, Number(o.nr) || i + 1)
   })
   return { format: 'json', rows, fatal: null }
@@ -162,6 +179,7 @@ function parseCsv(text: string, defaultTheme: string): ParseResult {
     a: col(['a', 'alternativ a', 'alternativ 1', '1']), b: col(['b', 'alternativ b', 'alternativ 2', '2']),
     c: col(['c', 'alternativ c', 'alternativ 3', '3']), d: col(['d', 'alternativ d', 'alternativ 4', '4']),
     correct: col(['riktig', 'correct', 'fasit']), explanation: col(['forklaring', 'explanation']), source: col(['kilde', 'source']),
+    sourceLevel: col(['kildenivå', 'kildenivaa', 'kilde_nivaa', 'source_level']), status: col(['status']), note: col(['merknad', 'note']),
   }
   const missing = (['question', 'a', 'b', 'c', 'd', 'correct'] as const).filter((k) => idx[k] < 0)
   if (missing.length) return { format: 'csv', rows: [], fatal: `Overskriften mangler kolonner: ${missing.map((m) => ({ question: 'spørsmål', a: 'A', b: 'B', c: 'C', d: 'D', correct: 'riktig' })[m]).join(', ')}.` }
@@ -170,6 +188,7 @@ function parseCsv(text: string, defaultTheme: string): ParseResult {
     theme: get(r, idx.theme), category: get(r, idx.category), difficulty: get(r, idx.difficulty), question: get(r, idx.question),
     options: [get(r, idx.a), get(r, idx.b), get(r, idx.c), get(r, idx.d)], correct: get(r, idx.correct),
     explanation: get(r, idx.explanation), source: get(r, idx.source),
+    sourceLevel: get(r, idx.sourceLevel), status: get(r, idx.status), note: get(r, idx.note),
   }, defaultTheme, i + 2))
   return { format: 'csv', rows, fatal: null }
 }
@@ -203,5 +222,6 @@ export function toExportJson(rows: (QuizQuestionInput & { hidden?: boolean })[])
     nr: i + 1, tema: q.theme, kategori: q.category ?? '', vanskelighet: q.difficulty ?? '', spoersmaal: q.question,
     alternativer: { A: q.options[0], B: q.options[1], C: q.options[2], D: q.options[3] },
     riktig: LETTERS[q.correct], forklaring: q.explanation, kilde: q.source ?? '',
+    kilde_nivaa: q.sourceLevel, status: q.reviewStatus === 'ok' ? 'OK' : q.reviewStatus === 'usikker' ? 'Usikker' : '', merknad: q.reviewNote ?? '',
   })), null, 2)
 }
