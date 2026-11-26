@@ -70,3 +70,21 @@ export function OfficeBoard({ offices, big = false }: { offices: OfficeRow[]; bi
 }
 
 export const LETTERS = ['A', 'B', 'C', 'D']
+
+/** Nedtelling før første spørsmål: en gave med ring som tømmes, rister de siste tre sekundene og åpnes ved 0. */
+export function GiftCountdown({ remaining, total = 10, big = false }: { remaining: number; total?: number; big?: boolean }) {
+  const secs = secondsLeft(remaining)
+  const frac = fractionLeft(remaining, total)
+  const last = secs <= 3 && remaining > 0
+  const open = remaining <= 0
+  return (
+    <div className={`gift-wrap ${big ? 'big' : ''}`} data-testid="quiz-nedtelling" role="timer" aria-label={`Quizen starter om ${secs} sekunder`}>
+      <div className="gift-stack">
+        <div className="gift-ring" style={{ ['--p' as string]: `${Math.round(frac * 360)}deg` }} />
+        <div className={`gift-emoji ${last ? 'shake' : ''}`} aria-hidden="true">{open ? '🎉' : '🎁'}</div>
+      </div>
+      <div key={secs} className={`gift-num ${last ? 'last' : ''}`} data-testid="quiz-nedtelling-tall">{open ? 'Kjør!' : secs}</div>
+      <p className="gift-label">{open ? 'Første spørsmål kommer …' : 'Quizen starter om …'}</p>
+    </div>
+  )
+}

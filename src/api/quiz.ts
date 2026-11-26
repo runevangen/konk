@@ -18,7 +18,7 @@ export interface QuizState {
   players: QuizPlayer[]
   // playing
   nr?: number
-  phase?: 'question' | 'answer'
+  phase?: 'countdown' | 'question' | 'answer'
   question?: string
   options?: string[]
   left_ms?: number

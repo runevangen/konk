@@ -4,7 +4,7 @@ import { quizAnswer, quizClose, quizJoin, quizSkip, quizStart, type QuizState } 
 import { errorMessage } from '../../api/functions'
 import { useAuth } from '../../auth'
 import { Loading } from '../../components/ui'
-import { Countdown, LETTERS, OfficeBoard, PlayersList, RankList } from '../../components/quiz/parts'
+import { Countdown, GiftCountdown, LETTERS, OfficeBoard, PlayersList, RankList } from '../../components/quiz/parts'
 import { isCode, joinErrorText, medal, normalizeCode, placeOf, secondsLeft } from '../../lib/quiz'
 import { useQuizRoom } from './useQuizRoom'
 
@@ -106,6 +106,7 @@ function Lobby({ state, code }: { state: QuizState; code: string }) {
 }
 
 function Playing({ state, remaining, chosen, onPick, busy }: { state: QuizState; remaining: number; chosen: number | null; onPick: (i: number) => void; busy: boolean }) {
+  if (state.phase === 'countdown') return <div className="card"><GiftCountdown remaining={remaining} /></div>
   const answerPhase = state.phase === 'answer'
   const options = state.options ?? []
   const mine = state.mine
@@ -195,7 +196,7 @@ function HostBar({ state, code, busy, onStart, onSkip, onClose }: { state: QuizS
           <button className="btn green" disabled={busy || players < 2} onClick={onStart}>Start quizen</button>
         )}
         {state.status === 'playing' && (
-          <button className="btn gold" disabled={busy} onClick={onSkip}>{state.phase === 'question' ? 'Vis fasit nå' : 'Hopp til neste'}</button>
+          <button className="btn gold" disabled={busy} onClick={onSkip}>{state.phase === 'countdown' ? 'Hopp over nedtellingen' : state.phase === 'question' ? 'Vis fasit nå' : 'Hopp til neste'}</button>
         )}
         <a className="btn ghost small" href={`/quiz/${code}/skjerm`} target="_blank" rel="noreferrer">Åpne storskjerm</a>
         <button className="btn ghost small" disabled={busy} onClick={onClose}>Avslutt og slett rommet</button>
@@ -205,4 +206,4 @@ function HostBar({ state, code, busy, onStart, onSkip, onClose }: { state: QuizS
     </div>
   )
 }
-const secondsLeftNote = (s: QuizState) => (s.phase === 'question' ? `${s.n_answered ?? 0} av ${s.n_players ?? 0} har svart.` : `Neste om ${secondsLeft(s.left_ms ?? 0)} s.`)
+const secondsLeftNote = (s: QuizState) => (s.phase === 'countdown' ? `Første spørsmål om ${secondsLeft(s.left_ms ?? 0)} s.` : s.phase === 'question' ? `${s.n_answered ?? 0} av ${s.n_players ?? 0} har svart.` : `Neste om ${secondsLeft(s.left_ms ?? 0)} s.`)
