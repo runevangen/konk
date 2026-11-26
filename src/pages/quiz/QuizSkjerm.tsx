@@ -7,14 +7,14 @@ import { isCode, isOfficeTie, normalizeCode, officeWinner, ranked } from '../../
 import { useQuizRoom } from './useQuizRoom'
 
 /** Flere enn dette får ikke plass på én projektor-skjerm; resten telles. */
-const MAKS_NAVN = 30
+const MAKS_NAVN = 14
 
 /** QR som lenker til `/quiz?kode=ABCD`, tegnet lokalt (ingen eksterne kall). */
 function Qr({ code }: { code: string }) {
   const [svg, setSvg] = useState('')
   useEffect(() => {
     let alive = true
-    import('qrcode').then((m) => m.toString(`${location.origin}/quiz?kode=${code}`, { type: 'svg', margin: 1, width: 240 }))
+    import('qrcode').then((m) => m.toString(`${location.origin}/quiz?kode=${code}`, { type: 'svg', margin: 2, width: 640, errorCorrectionLevel: 'L' }))
       .then((s) => { if (alive) setSvg(s) }).catch(() => undefined)
     return () => { alive = false }
   }, [code])
@@ -48,7 +48,7 @@ export default function QuizSkjerm() {
             <div className="skjerm-code" data-testid="skjerm-kode">{code}</div>
             <p className="skjerm-label">{state.n_questions} spørsmål · {state.seconds} sekunder hver</p>
           </div>
-          <Qr code={code} />
+          <div className="skjerm-qrboks"><Qr code={code} /><p className="skjerm-label"><strong>Skann for å bli med</strong></p></div>
         </div>
         <h2>Spillere ({state.players.length})</h2>
         <ul className="skjerm-spillere" data-testid="skjerm-spillere">

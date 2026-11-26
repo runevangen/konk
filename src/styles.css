@@ -299,3 +299,8 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 @keyframes gift-pop { 0% { transform: scale(1.6); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .gift-emoji.shake, .gift-num { animation: none; } }
 .pin-warn { background: #fff3c4; border: 2px solid var(--gold, #e8b84a); border-radius: 12px; padding: 10px 12px; font-size: 1.05rem; }
+/* Stor QR-kode: skal kunne skannes fra baksiden av rommet uten å zoome */
+.skjerm-qrboks { text-align: center; }
+.skjerm-qrboks .skjerm-label { margin: 2px 0 0; }
+.skjerm-qr { width: min(48vh, 400px); padding: 10px; border-radius: 14px; }
+.skjerm-code { font-size: clamp(3rem, 17vh, 8rem); }

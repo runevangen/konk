@@ -214,7 +214,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     const state = mk([{ name: 'Ny Kollega', office: 'Stavanger', host: false, me: true }])
     const { ctx, page } = await newPage(browser, state)
     await page.goto(BASE + '/quiz?kode=ABCD'); await page.waitForURL('**/login'); await snap(page, 'B1-qr-skanning-lander-pa-innlogging')
-    await page.getByRole('link', { name: 'Ny bruker' }).click(); await page.getByLabel('Navn', { exact: true }).waitFor()
+    await page.getByRole('link', { name: 'Ny bruker' }).click(); await page.getByRole('heading', { name: 'Ny bruker' }).waitFor()
     await page.getByLabel('Navn', { exact: true }).fill('Ny Kollega'); await page.getByLabel('Kontor').selectOption('of2'); await snap(page, 'B2-ny-bruker-navn-og-kontor')
     await page.getByRole('button', { name: 'Opprett bruker' }).click(); await page.getByTestId('pin').waitFor(); await snap(page, 'B3-pinkode-vises-en-gang')
     await page.getByRole('button', { name: 'Jeg har lagret koden – til quizen' }).click(); await page.getByTestId('quiz-kode').waitFor(); await snap(page, 'B4-rett-inn-i-venterommet')
