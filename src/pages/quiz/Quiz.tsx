@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { quizJoin, quizMyRooms } from '../../api/quiz'
 import { errorMessage } from '../../api/functions'
@@ -20,16 +20,30 @@ export default function Quiz() {
 
   useEffect(() => { document.title = 'Quiz – Konkurranser' }, [])
 
-  async function join(e: FormEvent) {
-    e.preventDefault()
-    if (!isCode(code)) { setError('Romkoden er fire bokstaver.'); return }
+  async function doJoin(c: string) {
     setBusy(true); setError(null)
     try {
-      const r = await quizJoin(code)
-      if ('ok' in r) nav(`/quiz/${r.code}`)
-      else setError(joinErrorText(r.error))
+      const r = await quizJoin(c)
+      if ('ok' in r) { nav(`/quiz/${r.code}`, { replace: true }); return }
+      setError(joinErrorText(r.error))
     } catch (err) { setError(errorMessage(err)) }
     setBusy(false)
+  }
+
+  // Kommer du fra en QR-kode eller lenke (?kode=ABCD), blir du med med en gang. Feiler det, står koden i feltet og feilen over.
+  const auto = useRef(false)
+  useEffect(() => {
+    const k = normalizeCode(params.get('kode') ?? '')
+    if (auto.current || !isCode(k)) return
+    auto.current = true
+    void doJoin(k)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function join(e: FormEvent) {
+    e.preventDefault()
+    if (!isCode(code)) { setError('Romkoden er fire bokstaver.'); return }
+    void doJoin(code)
   }
 
   return (
