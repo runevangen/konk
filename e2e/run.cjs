@@ -76,6 +76,26 @@ function makeBackend(state) {
       if (q.get('slug')) return single(eq('slug') === c.slug ? [c] : [])
       return json([c])
     }
+    if (state.glass) {
+      const G = state.glass
+      const m = req.method()
+      const idq = (q.get('id') || '').replace('eq.', '')
+      if (p.endsWith('/rest/v1/konk_items')) {
+        if (m === 'GET') return json(G.items.slice().sort((a, b) => a.position - b.position))
+        if (m === 'POST') { const b = req.postDataJSON(); const row = { id: 'ni' + b.position, image_path: null, ...b }; G.items.push(row); G.ops.push(['item+', b.position]); return json([row], 201) }
+        if (m === 'PATCH') { const it = G.items.find((x) => x.id === idq); Object.assign(it, req.postDataJSON()); G.ops.push(['item~', idq]); return json([it]) }
+        if (m === 'DELETE') { G.items = G.items.filter((x) => x.id !== idq); G.ops.push(['item-', idq]); return json([]) }
+      }
+      if (p.endsWith('/rest/v1/konk_item_answers')) {
+        if (m === 'GET') return json(Object.entries(G.answers).map(([item_id, correct_option_id]) => ({ item_id, correct_option_id })))
+        if (m === 'POST') { const b = req.postDataJSON(); G.answers[b.item_id] = b.correct_option_id; G.ops.push(['ans', b.item_id, b.correct_option_id]); return json([], 201) }
+        if (m === 'DELETE') { const iid = (q.get('item_id') || '').replace('eq.', ''); delete G.answers[iid]; G.ops.push(['ans-', iid]); return json([]) }
+      }
+      if (p.endsWith('/rest/v1/konk_guess_options')) {
+        if (m === 'GET') return json(G.options)
+        if (m === 'POST') { const b = req.postDataJSON(); const row = { id: 'no' + (G.options.length + 1), competition_id: 'c1', ...b }; G.options.push(row); G.ops.push(['opt+', b.label]); return json([row], 201) }
+      }
+    }
     if (p.endsWith('/rest/v1/konk_items')) {
       if (req.method() === 'HEAD') return route.fulfill({ status: 200, headers: { 'content-range': `0-0/${ITEMS.length}`, 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range' } })
       return json(ITEMS)
@@ -607,6 +627,79 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.deepStrictEqual(state.adminCalls.at(-1), { action: 'delete_user', user_id: 'u2' })
     assert.strictEqual(await page.getByText('Ola Hansen', { exact: true }).count(), 0)
     ok('admin: se brukere, søk, sett pinkode (svak avvist), ny tilfeldig og slett bruker')
+    await ctx.close()
+  }
+
+  {
+    // --- Admin: glass og fasit som én tabell (lagre alle, skjul fasit, fasitliste, lim inn liste) ---
+    const state = freshState({ admin: true })
+    state.glass = {
+      ops: [],
+      items: [1, 2, 3].map((n) => ({ id: 'g' + n, competition_id: 'c1', position: n, label: 'Glass ' + n, image_path: null })),
+      answers: { g1: 'o2', g2: 'o3' },
+      options: OPTIONS.map((o) => ({ ...o })),
+    }
+    const G = state.glass
+    const { ctx, page } = await newPage(browser, state)
+    page.on('dialog', (d) => d.accept())
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByRole('link', { name: 'Admin' }).click()
+    await page.getByRole('tab', { name: 'Glass og fasit' }).click()
+    await page.getByRole('heading', { name: /Glass og fasit \(3\)/ }).waitFor()
+    const rows = page.locator('[data-testid="glass-rad"]')
+    assert.strictEqual(await rows.count(), 3)
+    assert.strictEqual(await page.getByRole('button', { name: 'Lagre alle' }).isDisabled(), true, 'Lagre alle er av uten endringer')
+    // endre to glass, én lagring
+    await page.getByLabel('Fasit for glass 3').selectOption({ label: 'Solo' })
+    await page.getByLabel('Fasit for glass 1').selectOption({ label: 'Pepsi Jul' })
+    await page.getByRole('button', { name: 'Lagre alle (2 endringer)' }).waitFor()
+    assert.strictEqual(await page.locator('[data-dirty="1"]').count(), 2)
+    await shot(page, '17-glass-tabell')
+    await page.getByRole('button', { name: 'Lagre alle (2 endringer)' }).click()
+    await page.getByText('Lagret 2 glass.').waitFor()
+    assert.deepStrictEqual(G.answers, { g1: 'o5', g2: 'o3', g3: 'o4' })
+    // skjul fasit: ingen select, lagre er av, fasitlista skjult
+    await page.getByLabel('Skjul fasit').check()
+    assert.strictEqual(await page.locator('select[aria-label^="Fasit for glass"]').count(), 0, 'fasit er skjult')
+    assert.ok(!(await page.locator('main, #root').first().innerText()).includes('Solo'), 'brusnavn skjult')
+    await page.getByText('Fasitliste (for den som heller opp)').click()
+    await page.getByText('Fasiten er skjult. Slå av').waitFor()
+    await page.getByLabel('Skjul fasit').uncheck()
+    // fasitlista: stor tekst, Glass N: brus
+    const lis = await page.locator('[data-testid="fasitliste"] li').allInnerTexts()
+    assert.deepStrictEqual(lis.map((t) => t.replace(/\s+/g, ' ').trim()), ['Glass 1: Pepsi Jul', 'Glass 2: Julebrus B', 'Glass 3: Solo'])
+    // lim inn hele lista, med nummerering, merknad og et ukjent brusnavn
+    await page.getByRole('button', { name: 'Lim inn liste' }).click()
+    await page.getByLabel('Lista', { exact: true }).fill('1. Solo\n2. Pepsi Jul (T)\n3. Nytt Brus\n4. julebrus a\n')
+    assert.strictEqual(await page.locator('[data-testid="forhandsvisning-rad"]').count(), 4)
+    await page.getByText('Ny, ikke i gjettelisten').waitFor()
+    const apply = page.getByRole('button', { name: /Bruk lista/ })
+    await page.getByRole('checkbox', { name: /Legg til det nye brusnavnet/ }).uncheck()
+    assert.strictEqual(await apply.isDisabled(), true, 'ukjent brus uten å legge til blokkerer')
+    await page.getByRole('checkbox', { name: /Legg til det nye brusnavnet/ }).check()
+    await shot(page, '18-lim-inn-liste')
+    await apply.click()
+    await page.getByText(/Fasiten er satt for 4 glass/).waitFor()
+    assert.ok(G.ops.some((o) => o[0] === 'opt+' && o[1] === 'Nytt Brus'), 'nytt brus lagt til i gjettelisten')
+    assert.ok(G.ops.some((o) => o[0] === 'item+' && o[1] === 4), 'glass 4 opprettet')
+    const idOf = (label) => G.options.find((o) => o.label === label).id
+    const g4 = G.items.find((i) => i.position === 4).id
+    assert.deepStrictEqual(G.answers, { g1: idOf('Solo'), g2: idOf('Pepsi Jul'), g3: idOf('Nytt Brus'), [g4]: idOf('Julebrus A') })
+    await page.getByRole('heading', { name: /Glass og fasit \(4\)/ }).waitFor()
+    assert.strictEqual(await page.getByLabel('Fasit for glass 4').inputValue(), idOf('Julebrus A'))
+    // slett glass 4
+    await page.getByRole('button', { name: 'Slett glass 4' }).click()
+    await page.getByRole('heading', { name: /Glass og fasit \(3\)/ }).waitFor()
+    assert.ok(G.ops.some((o) => o[0] === 'item-' && o[1] === g4), 'glass 4 slettet')
+    // bytte posisjon på to glass via Avansert krever bare én lagring
+    await page.getByText('Avansert: navn og posisjon').click()
+    await page.getByLabel('Posisjon for glass 1').fill('2')
+    await page.getByLabel('Posisjon for glass 2').fill('1')
+    await page.getByRole('button', { name: /Lagre alle \(2 endringer\)/ }).click()
+    await page.getByText('Lagret 2 glass.').waitFor()
+    assert.deepStrictEqual(G.items.map((i) => [i.id, i.position]).sort(), [['g1', 2], ['g2', 1], ['g3', 3]])
+    ok('admin: glass og fasit som tabell: lagre alle, skjul fasit, fasitliste, lim inn liste og slett')
     await ctx.close()
   }
 
