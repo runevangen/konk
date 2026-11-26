@@ -249,3 +249,32 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .skjerm .soft, .skjerm .small { color: rgba(255,255,255,.78); }
 .skjerm .skjerm-spillere .soft, .skjerm .skjerm-pall .soft { color: #555; }
 .skjerm .countdown { height: 22px; }
+.skjerm-spillere { gap: 6px; font-size: .75em; }
+.skjerm-spillere li { padding: 3px 12px; }
+.skjerm-spillere li.skjerm-flere { background: var(--gold, #e8b84a); color: #2a1d00; }
+.rank-list.compact .rank-row { padding-top: 3px; padding-bottom: 3px; font-size: .8em; }
+.skjerm-vinner { background: linear-gradient(90deg, #ffe08a, #fff3c4); font-size: 1.8em; border: 3px solid #e8b84a; }
+
+/* Storskjerm: bred og uten rulling på en 1280x720-projektor */
+.skjerm { width: 96vw; max-width: 1500px; margin-left: calc(50% - min(48vw, 750px)); font-size: clamp(1rem, 2.6vh, 1.6rem); padding-bottom: 8px; }
+.skjerm h1 { font-size: clamp(1.6rem, 5.6vh, 3.2rem); margin: .15em 0; }
+.skjerm h2 { font-size: clamp(1.1rem, 3.4vh, 1.8rem); margin: .2em 0 .3em; }
+.skjerm .skjerm-spm { margin: .2em 0 .4em; }
+.skjerm-2k { display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: start; }
+.skjerm-2k .skjerm-valg { grid-template-columns: 1fr; gap: 8px; }
+.skjerm-2k .skjerm-opt { padding: 8px 14px; font-size: .95em; }
+.skjerm-opt { padding: 10px 16px; }
+.skjerm .rank-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.skjerm .rank-list.compact .rank-row { padding-top: 2px; padding-bottom: 2px; font-size: .85em; }
+.skjerm .office-board.big { font-size: .9em; }
+.skjerm-lobby { gap: 20px; }
+.skjerm-code { font-size: clamp(3rem, 20vh, 9rem); }
+.skjerm-qr { width: min(200px, 28vh); }
+.skjerm-pall li { margin: 6px 0; padding: 8px 16px; }
+.skjerm-bunn { gap: 28px; }
+.skjerm-modus .app-header { display: none; }
+.skjerm-modus main { padding-top: 6px; }
+.skjerm .rank-list.compact .rank-row { font-size: .8em; }
+.skjerm .office-board.big { font-size: .8em; }
+.skjerm .office-board.big * { margin-top: 0; margin-bottom: 2px; }
+.skjerm-vinner { font-size: 1.5em; }

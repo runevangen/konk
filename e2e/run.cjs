@@ -1004,21 +1004,21 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.strictEqual(await page.getByTestId('skjerm-kode').textContent(), 'ABCD')
     await page.locator('[data-testid="skjerm-qr"] svg').waitFor()
     assert.strictEqual(await page.getByTestId('skjerm-spillere').locator('li').count(), 2)
-    await shot(page, '35-skjerm-lobby')
+    await shot(page, '35-skjerm-lobby'); assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, 'storskjermen må passe på 1280x720 uten rulling: 35-skjerm-lobby')
     state.qz.state = { ...base, status: 'playing', players: pl, nr: 0, phase: 'question', question: 'Hvem er størst?', options: ['A1', 'B1', 'C1', 'D1'], left_ms: 20000, n_answered: 1, n_players: 2 }
     await page.getByTestId('skjerm-sporsmal').waitFor({ timeout: 5000 })
     assert.strictEqual(await page.locator('[data-state="riktig"]').count(), 0)
     await page.getByText('1 av 2 har svart').waitFor()
-    await shot(page, '36-skjerm-sporsmal')
+    await shot(page, '36-skjerm-sporsmal'); assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, 'storskjermen må passe på 1280x720 uten rulling: 36-skjerm-sporsmal')
     state.qz.state = { ...base, status: 'playing', players: pl, nr: 0, phase: 'answer', question: 'Hvem er størst?', options: ['A1', 'B1', 'C1', 'D1'], left_ms: 5000, correct_index: 2, explanation: 'Fordi.', ranking: rk, offices: of }
     await page.locator('[data-state="riktig"]').waitFor({ timeout: 5000 })
     assert.ok(/C1/.test(await page.locator('[data-state="riktig"]').textContent()))
-    await page.getByText('Topp 5').waitFor()
-    await shot(page, '37-skjerm-fasit')
+    await page.getByText('Stillingen – topp 10').waitFor()
+    await shot(page, '37-skjerm-fasit'); assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, 'storskjermen må passe på 1280x720 uten rulling: 37-skjerm-fasit')
     state.qz.state = { ...base, status: 'finished', players: pl, ranking: rk, offices: of }
     await page.getByTestId('skjerm-pall').waitFor({ timeout: 5000 })
-    assert.ok(/Ola/.test(await page.getByTestId('skjerm-pall').locator('li').first().textContent()))
-    await shot(page, '38-skjerm-pall')
+    assert.ok(/Ola/.test(await page.getByTestId('skjerm-pall').locator('li').first().textContent())); await page.getByText('Topp 10', { exact: true }).waitFor()
+    await shot(page, '38-skjerm-pall'); assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, 'storskjermen må passe på 1280x720 uten rulling: 38-skjerm-pall')
     state.qz.state = { ...base, is_host: false, status: 'lobby', players: pl }
     await page.getByText('Bare verten kan vise storskjerm').waitFor({ timeout: 5000 })
     assert.deepStrictEqual(errors, [])

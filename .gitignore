@@ -7,3 +7,4 @@ dist
 
 # e2e genererer skjermbilder ved hver kjøring; ikke versjonskontroller (gir flettekonflikter)
 docs/screenshots/
+docs/demo/

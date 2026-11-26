@@ -3,8 +3,11 @@ import { Link, useParams } from 'react-router-dom'
 import { errorMessage } from '../../api/functions'
 import { Loading } from '../../components/ui'
 import { Countdown, LETTERS, OfficeBoard, RankList } from '../../components/quiz/parts'
-import { isCode, medal, normalizeCode, ranked } from '../../lib/quiz'
+import { isCode, isOfficeTie, normalizeCode, officeWinner, ranked } from '../../lib/quiz'
 import { useQuizRoom } from './useQuizRoom'
+
+/** Flere enn dette får ikke plass på én projektor-skjerm; resten telles. */
+const MAKS_NAVN = 30
 
 /** QR som lenker til `/quiz?kode=ABCD`, tegnet lokalt (ingen eksterne kall). */
 function Qr({ code }: { code: string }) {
@@ -24,6 +27,8 @@ export default function QuizSkjerm() {
   const code = normalizeCode(kode)
   const { state, error, remaining } = useQuizRoom(isCode(code) ? code : '', 1000)
   useEffect(() => { document.title = `Storskjerm ${code} – Konkurranser` }, [code])
+  // Skjul toppraden på projektoren: den tar plass og er ikke til å trykke på der.
+  useEffect(() => { document.body.classList.add('skjerm-modus'); return () => document.body.classList.remove('skjerm-modus') }, [])
 
   const wrap = (c: React.ReactNode) => <div className="skjerm" data-testid="skjerm">{c}</div>
   if (!isCode(code)) return wrap(<p>Ugyldig romkode.</p>)
@@ -47,7 +52,8 @@ export default function QuizSkjerm() {
         </div>
         <h2>Spillere ({state.players.length})</h2>
         <ul className="skjerm-spillere" data-testid="skjerm-spillere">
-          {state.players.map((p, i) => <li key={i}>{p.name} <span className="soft">· {p.office}</span></li>)}
+          {state.players.slice(0, MAKS_NAVN).map((p, i) => <li key={i}>{p.name} <span className="soft">· {p.office}</span></li>)}
+          {state.players.length > MAKS_NAVN && <li className="skjerm-flere" data-testid="skjerm-flere">+{state.players.length - MAKS_NAVN} til</li>}
         </ul>
       </>,
     )
@@ -60,39 +66,50 @@ export default function QuizSkjerm() {
       <>
         <p className="skjerm-label">Spørsmål {(state.nr ?? 0) + 1} av {state.n_questions} · rom {code}</p>
         <Countdown remaining={remaining} totalSeconds={total} label={answer ? 'Neste om' : 'Tid igjen'} />
-        <h1 className="skjerm-spm" data-testid="skjerm-sporsmal">{state.question}</h1>
-        <div className="skjerm-valg">
-          {(state.options ?? []).map((o, i) => (
-            <div key={i} className={`skjerm-opt ${answer && i === state.correct_index ? 'correct' : ''} ${answer && i !== state.correct_index ? 'dim' : ''}`}
-              data-testid="skjerm-valg" data-state={answer && i === state.correct_index ? 'riktig' : ''}>
-              <span className="letter">{LETTERS[i]}</span><span>{o}</span>
+        <div className={answer ? 'skjerm-2k' : ''}>
+          <div>
+            <h1 className="skjerm-spm" data-testid="skjerm-sporsmal">{state.question}</h1>
+            <div className="skjerm-valg">
+              {(state.options ?? []).map((o, i) => (
+                <div key={i} className={`skjerm-opt ${answer && i === state.correct_index ? 'correct' : ''} ${answer && i !== state.correct_index ? 'dim' : ''}`}
+                  data-testid="skjerm-valg" data-state={answer && i === state.correct_index ? 'riktig' : ''}>
+                  <span className="letter">{LETTERS[i]}</span><span>{o}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        {!answer && <p className="skjerm-label" data-testid="skjerm-svart">{state.n_answered ?? 0} av {state.n_players ?? 0} har svart</p>}
-        {answer && state.explanation && <p className="skjerm-forklaring">{state.explanation}</p>}
-        {answer && state.ranking && (
-          <div className="skjerm-bunn">
-            <div><h2>Topp 5</h2><RankList rows={state.ranking} limit={5} big /></div>
-            {state.offices && <div><h2>Kontorene</h2><OfficeBoard offices={state.offices} big /></div>}
+            {!answer && <p className="skjerm-label" data-testid="skjerm-svart">{state.n_answered ?? 0} av {state.n_players ?? 0} har svart</p>}
+            {answer && state.explanation && <p className="skjerm-forklaring">{state.explanation}</p>}
           </div>
-        )}
+          {answer && state.ranking && (
+            <div>
+              <h2>Stillingen – topp 10</h2>
+              <RankList rows={state.ranking} limit={10} big compact hideMe />
+              {state.offices && <OfficeBoard offices={state.offices} big />}
+            </div>
+          )}
+        </div>
       </>,
     )
   }
 
   const rows = state.ranking ?? []
-  const top = ranked(rows).slice(0, 3)
+  const all = ranked(rows)
+  const winners = all.filter((r) => r.rank === 1)
+  const office = state.offices ? officeWinner(state.offices) : null
   return wrap(
     <>
-      <h1>Ferdig! 🎄</h1>
+      <p className="skjerm-label">Quizen er ferdig 🎄</p>
+      <h1>{winners.length > 1 ? '🏆 Vinnerne er…' : '🏆 Vinneren er…'}</h1>
       <ol className="skjerm-pall" data-testid="skjerm-pall">
-        {top.map(({ rank, row }, i) => (
-          <li key={i}><span className="skjerm-medalje">{medal(rank)}</span><strong>{row.name}</strong> <span className="soft">· {row.office}</span><span className="skjerm-poeng">{row.points} p</span></li>
+        {winners.map(({ row }, i) => (
+          <li key={i} className="skjerm-vinner"><span className="skjerm-medalje">🥇</span><strong>{row.name}</strong> <span className="soft">· {row.office}</span><span className="skjerm-poeng">{row.points} p · {row.correct} riktige</span></li>
         ))}
       </ol>
-      {state.offices && <OfficeBoard offices={state.offices} big />}
-      <details className="skjerm-alle"><summary>Hele listen</summary><RankList rows={rows} big /></details>
+      {office && !isOfficeTie(state.offices ?? []) && <p className="skjerm-label" data-testid="skjerm-kontorvinner">Beste kontor: <strong>{office.office}</strong> (høyest snitt per spiller)</p>}
+      <div className="skjerm-bunn">
+        <div><h2>Topp 10</h2><RankList rows={rows} limit={10} big compact hideMe /></div>
+        {state.offices && <div><h2>Kontorene</h2><OfficeBoard offices={state.offices} big /></div>}
+      </div>
     </>,
   )
 }
