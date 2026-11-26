@@ -21,7 +21,7 @@ function RequireAuth({ children, admin = false }: { children: React.ReactElement
   const { loading, session, profile } = useAuth()
   const loc = useLocation()
   if (loading) return <Loading />
-  if (!session) return <Navigate to="/login" replace state={{ from: loc.pathname }} />
+  if (!session) return <Navigate to="/login" replace state={{ from: loc.pathname + loc.search }} />
   if (admin && !profile?.is_admin) return <Navigate to="/" replace />
   return children
 }

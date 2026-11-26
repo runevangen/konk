@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { applySession, errorMessage, register } from '../api/functions'
 import { listOffices } from '../api/data'
 import { useAsync } from '../hooks'
@@ -21,6 +21,9 @@ export default function Register() {
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState<'ok' | 'fail' | null>(null)
   const nav = useNavigate()
+  const loc = useLocation()
+  // Kom du fra en lenke (f.eks. quiz-QR med ?kode=), skal du tilbake dit etter registreringen.
+  const from = (loc.state as { from?: string } | null)?.from ?? '/'
 
   useEffect(() => {
     if (!pin) return
@@ -48,7 +51,7 @@ export default function Register() {
     if (!pin) return
     try { await navigator.clipboard.writeText(pin); setCopied('ok') } catch { setCopied('fail') }
   }
-  function done() { setPin(null); nav('/', { replace: true }) }
+  function done() { setPin(null); nav(from, { replace: true }) }
 
   if (pin) {
     return (
@@ -94,7 +97,7 @@ export default function Register() {
         {error && <p className="error" role="alert">{error}</p>}
         <button className="btn block" disabled={busy}>{busy ? 'Oppretter …' : 'Opprett bruker'}</button>
       </form>
-      <p style={{ marginTop: 16 }}><Link to="/login">Har du allerede pinkode? Logg inn</Link></p>
+      <p style={{ marginTop: 16 }}><Link to="/login" state={{ from }}>Har du allerede pinkode? Logg inn</Link></p>
     </div>
   )
 }
