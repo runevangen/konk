@@ -1044,6 +1044,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
       await page.goto(BASE + '/quiz?kode=ABCD')
       await page.waitForURL('**/login')
       await page.getByRole('link', { name: 'Ny bruker' }).click()
+      await page.getByRole('heading', { name: 'Ny bruker' }).waitFor()
       await page.getByLabel('Navn', { exact: true }).fill('Ny Kollega')
       await page.getByLabel('Kontor').selectOption('of2')
       await page.getByRole('button', { name: 'Opprett bruker' }).click()
