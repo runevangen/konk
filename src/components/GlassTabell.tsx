@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addOption, deleteItem, listAnswers, listItems, listOptions, saveItem, setAnswer } from '../api/data'
+import { addOption, deleteItem, listAnswers, listCompetitionEntries, listItems, listOptions, saveItem, setAnswer } from '../api/data'
 import type { Competition, GuessOption, Id, Item } from '../api/types'
 import { useAsync } from '../hooks'
 import { fasitText, newOptionNames, normalizeName, parseFasitList } from '../lib/fasit'
@@ -37,6 +37,7 @@ export default function GlassTabell({ comp, run }: { comp: Competition; run: Run
   const [showPaste, setShowPaste] = useState(false)
   const [paste, setPaste] = useState('')
   const [addUnknown, setAddUnknown] = useState(true)
+  const [removeExtra, setRemoveExtra] = useState(true)
   const [showList, setShowList] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -110,33 +111,50 @@ export default function GlassTabell({ comp, run }: { comp: Competition; run: Run
   const hasAnswers = items.some((i) => answers[i.id])
   const canApply = parsed.length > 0 && (unknown.length === 0 || addUnknown)
   const beyond = items.filter((i) => i.position > parsed.length)
+  const toRemove = removeExtra ? beyond : []
 
   async function applyList() {
     if (!items || !options || !canApply) return
-    if (hasAnswers && !confirm(`Dette setter fasiten for glass 1–${parsed.length} fra lista og overskriver det som står. Fortsette?`)) return
+    // Antall deltakersvar som forsvinner sammen med glass som fjernes
+    let lost = 0
+    if (toRemove.length) {
+      const entries = await listCompetitionEntries(toRemove.map((i) => i.id)).catch(() => [])
+      lost = entries.length
+    }
+    const parts: string[] = []
+    if (hasAnswers) parts.push(`overskriver fasiten for glass 1–${parsed.length}`)
+    if (toRemove.length) parts.push(`fjerner glass ${toRemove.map((i) => i.position).join(', ')}${lost ? ` og ${lost} ${lost === 1 ? 'deltakersvar' : 'deltakersvar'} på dem` : ''}`)
+    if (parts.length && !confirm(`Dette ${parts.join(', og ')}. Det kan ikke angres. Fortsette?`)) return
     setBusy(true); setMsg(null)
     await run(async () => {
       const names = newOptionNames(parsed)
       for (const n of names) await addOption(comp.id, n)
       const options2 = names.length ? await listOptions(comp.id) : options
       const idByName = new Map(options2.map((o) => [normalizeName(o.label), o.id]))
+      for (const i of toRemove) await deleteItem(i.id)
       const missing = parsed.filter((r) => !items.some((i) => i.position === r.pos))
       for (const r of missing) await saveItem({ competition_id: comp.id, label: `Glass ${r.pos}`, position: r.pos })
-      const items2 = missing.length ? await listItems(comp.id) : items
+      const items2 = missing.length ? await listItems(comp.id) : items.filter((i) => !toRemove.some((t) => t.id === i.id))
       let set = 0
       for (const r of parsed) {
         const it = items2.find((i) => i.position === r.pos)
         const id = idByName.get(normalizeName(r.match ?? r.name))
         if (it && id) { await setAnswer(it.id, id); set++ }
       }
-      setMsg(`Fasiten er satt for ${set} glass${names.length ? `, og ${names.length} nye brus ble lagt til i gjettelisten` : ''}${missing.length ? `. ${missing.length} nye glass ble opprettet` : ''}.`)
+      const extra = [
+        names.length ? `${names.length} nye brus ble lagt til i gjettelisten` : '',
+        missing.length ? `${missing.length} nye glass ble opprettet` : '',
+        toRemove.length ? `${toRemove.length} glass ble fjernet` : '',
+      ].filter(Boolean)
+      setMsg(`Fasiten er satt for ${set} glass${extra.length ? `. ${extra.join(', ')}` : ''}.`)
       setPaste(''); setShowPaste(false)
       await data.reload()
     })
     setBusy(false)
   }
 
-  const listRows = items.map((i) => ({ pos: i.position, brus: optionName(answers[i.id] ?? '') }))
+  const listRows = items.map((i) => ({ pos: Number(draftOf(i).pos) || i.position, brus: optionName(draftOf(i).ans), unsaved: isDirty(i) }))
+    .sort((a, b) => a.pos - b.pos)
   async function copyList() {
     try { await navigator.clipboard.writeText(fasitText(listRows)); setMsg('Fasitlista er kopiert.') }
     catch { setMsg('Kunne ikke kopiere. Marker teksten selv.') }
@@ -206,7 +224,7 @@ export default function GlassTabell({ comp, run }: { comp: Competition; run: Run
       {showPaste && (
         <div className="card">
           <h2>Lim inn hele lista</h2>
-          <p className="soft small">Én brus per linje, i den rekkefølgen glassene står (første linje er glass 1). Nummerering og merknader i parentes, som «(N)», fjernes. Du får se en forhåndsvisning før noe lagres.</p>
+          <p className="soft small">Én brus per linje, i den rekkefølgen glassene står (første linje er glass 1). <strong>Lista bestemmer hvor mange glass det er:</strong> nye glass opprettes, og glass utover lista kan fjernes. Nummerering og merknader i parentes, som «(N)», fjernes. Du ser en forhåndsvisning før noe lagres.</p>
           <label className="field" htmlFor="fasit-liste">Lista</label>
           <textarea id="fasit-liste" rows={8} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={'Hamar\nAskim\nRingnes'} style={{ minHeight: 140 }} />
           {parsed.length > 0 && (
@@ -224,6 +242,13 @@ export default function GlassTabell({ comp, run }: { comp: Competition; run: Run
                       </td>
                     </tr>
                   ))}
+                  {toRemove.map((i) => (
+                    <tr key={'fjern' + i.id} data-testid="forhandsvisning-fjernes">
+                      <td>Glass {i.position}</td>
+                      <td><s>{optionName(answers[i.id] ?? '') ?? 'ingen fasit'}</s></td>
+                      <td className="small error">Fjernes</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
               {unknown.length > 0 && (
@@ -233,9 +258,15 @@ export default function GlassTabell({ comp, run }: { comp: Competition; run: Run
                     <span className="soft small">Ellers kan ikke lista brukes. Sjekk stavemåten først.</span></span>
                 </label>
               )}
-              {beyond.length > 0 && <p className="soft small">{beyond.length} glass utover lista ({beyond.map((i) => i.position).join(', ')}) endres ikke.</p>}
+              {beyond.length > 0 && (
+                <label className="toggle" style={{ marginTop: 10 }}>
+                  <input type="checkbox" checked={removeExtra} onChange={(e) => setRemoveExtra(e.target.checked)} />
+                  <span><strong>Fjern {beyond.length === 1 ? `glass ${beyond[0].position}` : `de ${beyond.length} glassene utover lista (${beyond.map((i) => i.position).join(', ')})`}</strong><br />
+                    <span className="soft small">Deltakersvar på glassene som fjernes, slettes også. Uten hake blir de stående uendret.</span></span>
+                </label>
+              )}
               <div className="row" style={{ marginTop: 10 }}>
-                <button className="btn" disabled={busy || !canApply} onClick={() => void applyList()}>Bruk lista ({parsed.length} glass)</button>
+                <button className="btn" disabled={busy || !canApply} onClick={() => void applyList()}>Bruk lista ({parsed.length} glass{toRemove.length ? `, fjern ${toRemove.length}` : ''})</button>
                 <button className="btn ghost small" onClick={() => { setPaste(''); setShowPaste(false) }}>Avbryt</button>
               </div>
             </>
@@ -249,11 +280,12 @@ export default function GlassTabell({ comp, run }: { comp: Competition; run: Run
           <p className="soft">Fasiten er skjult. Slå av «Skjul fasit» for å se lista.</p>
         ) : (
           <>
+            <p className="soft small" style={{ margin: '8px 0 0' }}>Lista følger glassene i tabellen, også endringer som ikke er lagret, og vokser og krymper når glass legges til eller fjernes.</p>
             <ol className="fasit-liste" style={{ listStyle: 'none', padding: 0, margin: '12px 0' }} data-testid="fasitliste">
               {listRows.map((r) => (
                 <li key={r.pos} style={{ fontSize: '1.6rem', lineHeight: 1.5, fontFamily: 'Georgia, serif' }}>
                   <span style={{ color: 'var(--red)', fontWeight: 700 }}>Glass {r.pos}</span>{': '}
-                  <strong>{r.brus ?? '–'}</strong>
+                  <strong>{r.brus ?? '–'}</strong>{r.unsaved && <span className="soft small" title="Ulagret endring"> ● ulagret</span>}
                 </li>
               ))}
             </ol>

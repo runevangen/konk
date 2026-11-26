@@ -641,7 +641,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     }
     const G = state.glass
     const { ctx, page } = await newPage(browser, state)
-    page.on('dialog', (d) => d.accept())
+    const dialogs = []
+    page.on('dialog', (d) => { dialogs.push(d.message()); void d.accept() })
     await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
     await page.getByRole('link', { name: 'Admin' }).click()
@@ -656,6 +657,13 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('button', { name: 'Lagre alle (2 endringer)' }).waitFor()
     assert.strictEqual(await page.locator('[data-dirty="1"]').count(), 2)
     await shot(page, '17-glass-tabell')
+    // fasitlista følger tabellen, også ulagrede endringer
+    await page.getByText('Fasitliste (for den som heller opp)').click()
+    const live = (await page.locator('[data-testid="fasitliste"] li').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+    assert.ok(live[0].startsWith('Glass 1: Pepsi Jul') && live[0].includes('ulagret'), 'fasitlista viser ulagret endring: ' + live[0])
+    assert.ok(live[2].startsWith('Glass 3: Solo') && live[2].includes('ulagret'), 'fasitlista viser ulagret endring: ' + live[2])
+    assert.ok(!live[1].includes('ulagret'), 'uendret rad er ikke merket')
+    await page.getByText('Fasitliste (for den som heller opp)').click()
     await page.getByRole('button', { name: 'Lagre alle (2 endringer)' }).click()
     await page.getByText('Lagret 2 glass.').waitFor()
     assert.deepStrictEqual(G.answers, { g1: 'o5', g2: 'o3', g3: 'o4' })
@@ -688,10 +696,46 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.deepStrictEqual(G.answers, { g1: idOf('Solo'), g2: idOf('Pepsi Jul'), g3: idOf('Nytt Brus'), [g4]: idOf('Julebrus A') })
     await page.getByRole('heading', { name: /Glass og fasit \(4\)/ }).waitFor()
     assert.strictEqual(await page.getByLabel('Fasit for glass 4').inputValue(), idOf('Julebrus A'))
-    // slett glass 4
+    // slett glass 4 manuelt, og legg til igjen med knappen
     await page.getByRole('button', { name: 'Slett glass 4' }).click()
     await page.getByRole('heading', { name: /Glass og fasit \(3\)/ }).waitFor()
     assert.ok(G.ops.some((o) => o[0] === 'item-' && o[1] === g4), 'glass 4 slettet')
+    await page.getByRole('button', { name: '+ Legg til glass' }).click()
+    await page.getByRole('heading', { name: /Glass og fasit \(4\)/ }).waitFor()
+    // dynamisk liste: en kortere liste fjerner glass utover lista, med valg om å la dem stå
+    await page.getByRole('button', { name: 'Lim inn liste' }).click()
+    await page.getByLabel('Lista', { exact: true }).fill('Solo\nPepsi Jul\nNytt Brus')
+    await page.locator('[data-testid="forhandsvisning-fjernes"]').waitFor()
+    await page.getByRole('checkbox', { name: /Fjern glass 4/ }).uncheck()
+    assert.strictEqual(await page.locator('[data-testid="forhandsvisning-fjernes"]').count(), 0, 'uten hake fjernes ingenting')
+    await page.getByRole('checkbox', { name: /Fjern glass 4/ }).check()
+    dialogs.length = 0
+    await page.getByRole('button', { name: /Bruk lista \(3 glass, fjern 1\)/ }).click()
+    await page.getByText(/1 glass ble fjernet/).waitFor()
+    await page.getByRole('heading', { name: /Glass og fasit \(3\)/ }).waitFor()
+    assert.ok(dialogs.some((m) => m.includes('fjerner glass 4')), 'bekreftelsen nevner hva som fjernes: ' + dialogs.join(' | '))
+    assert.strictEqual(G.items.length, 3, 'glass 4 er fjernet av lista')
+    // en lengre liste oppretter nye glass, og en kortere fjerner dem igjen
+    await page.getByRole('button', { name: 'Lim inn liste' }).click()
+    await page.getByLabel('Lista', { exact: true }).fill('Solo\nPepsi Jul\nNytt Brus\nMineralvann\nJulebrus A')
+    assert.strictEqual(await page.locator('[data-testid="forhandsvisning-fjernes"]').count(), 0)
+    await page.getByRole('button', { name: /Bruk lista \(5 glass\)/ }).click()
+    await page.getByText(/2 nye glass ble opprettet/).waitFor()
+    await page.getByRole('heading', { name: /Glass og fasit \(5\)/ }).waitFor()
+    assert.strictEqual(G.items.length, 5)
+    assert.strictEqual(await page.getByLabel('Fasit for glass 5').inputValue(), idOf('Julebrus A'))
+    // fasitlista vokser med glassene
+    const lista = page.locator('details', { hasText: 'Fasitliste (for den som heller opp)' })
+    if (!(await lista.evaluate((e) => e.open))) await page.getByText('Fasitliste (for den som heller opp)').click()
+    await page.locator('[data-testid="fasitliste"] li').first().waitFor()
+    const five = (await page.locator('[data-testid="fasitliste"] li').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+    assert.deepStrictEqual(five, ['Glass 1: Solo', 'Glass 2: Pepsi Jul', 'Glass 3: Nytt Brus', 'Glass 4: Mineralvann', 'Glass 5: Julebrus A'])
+    await page.getByRole('button', { name: 'Lim inn liste' }).click()
+    await page.getByLabel('Lista', { exact: true }).fill('Solo\nPepsi Jul\nNytt Brus')
+    await page.getByRole('checkbox', { name: /Fjern de 2 glassene utover lista \(4, 5\)/ }).waitFor()
+    await page.getByRole('button', { name: /Bruk lista \(3 glass, fjern 2\)/ }).click()
+    await page.getByRole('heading', { name: /Glass og fasit \(3\)/ }).waitFor()
+    assert.strictEqual(G.items.length, 3)
     // bytte posisjon på to glass via Avansert krever bare én lagring
     await page.getByText('Avansert: navn og posisjon').click()
     await page.getByLabel('Posisjon for glass 1').fill('2')
