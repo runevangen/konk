@@ -76,6 +76,22 @@ function makeBackend(state) {
       if (q.get('slug')) return single(eq('slug') === c.slug ? [c] : [])
       return json([c])
     }
+    if (state.quiz && p.endsWith('/rest/v1/konk_quiz_questions')) {
+      const Qz = state.quiz
+      const m = req.method()
+      const ids = () => { const v = q.get('id') || ''; const mm = v.match(/^in\.\((.*)\)$/); return mm ? mm[1].split(',') : [v.replace('eq.', '')] }
+      const key = (r) => (r.theme.trim().toLowerCase() + '|' + r.question.trim().toLowerCase())
+      if (m === 'GET') return json(Qz.rows)
+      if (m === 'POST') {
+        const body = req.postDataJSON(); const list = Array.isArray(body) ? body : [body]
+        const have = new Set(Qz.rows.map(key)); const mine = new Set()
+        for (const r of list) { const k = key(r); if (have.has(k) || mine.has(k)) return json({ code: '23505', message: 'duplicate key value violates unique constraint' }, 409); mine.add(k) }
+        for (const r of list) { Qz.rows.push({ id: 'qz' + (++Qz.n), hidden: false, created_at: '2026-12-01T10:00:00Z', ...r }); Qz.ops.push(['+', r.question]) }
+        return json([], 201)
+      }
+      if (m === 'PATCH') { const b = req.postDataJSON(); for (const r of Qz.rows) if (ids().includes(r.id)) Object.assign(r, b); Qz.ops.push(['~', ids().join(',')]); return json([]) }
+      if (m === 'DELETE') { Qz.rows = Qz.rows.filter((r) => !ids().includes(r.id)); Qz.ops.push(['-', ids().join(',')]); return json([]) }
+    }
     if (state.glass) {
       const G = state.glass
       const m = req.method()
@@ -336,6 +352,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('button', { name: 'Neste →' }).click()
     await page.getByRole('button', { name: 'Neste →' }).click()
     await page.getByRole('button', { name: '← Forrige' }).click()
+    await page.getByRole('heading', { name: /Glass 2 av 6/ }).waitFor()
     const cur = Number((await page.getByRole('heading', { level: 2 }).first().innerText()).match(/Glass (\d) av/)[1])
     assert.deepStrictEqual(await onScores(), [String(values[cur - 1])])
     // og etter oppdatering av siden
@@ -747,6 +764,106 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await ctx.close()
   }
 
+  {
+    // --- Admin: quiz-spørsmål (import JSON/CSV, forhåndsvisning, søk, redigering, skjul, slett, eksport) ---
+    const state = freshState({ admin: true })
+    state.quiz = { rows: [], ops: [], n: 0 }
+    const Z = state.quiz
+    const { ctx, page } = await newPage(browser, state)
+    page.on('dialog', (d) => { void d.accept() })
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByRole('link', { name: 'Admin' }).click()
+    await page.getByRole('tab', { name: 'Quiz-spørsmål' }).click()
+    await page.getByText('Ingen spørsmål ennå.').waitFor()
+    // oppdiktede spørsmål (ekte quizer skal ikke ligge i repoet)
+    const mk = (nr, over = {}) => ({ nr, kategori: 'Test', vanskelighet: 'Lett', spoersmaal: 'Testspørsmål ' + nr + '?', alternativer: { A: 'Ja', B: 'Nei', C: 'Kanskje', D: 'Vet ikke' }, riktig: 'B', forklaring: 'Forklaring ' + nr, kilde: '', ...over })
+    const json1 = JSON.stringify([mk(1, { kilde_nivaa: 1, status: 'OK' }), mk(2, { kategori: 'Mat', kilde_nivaa: 3, status: 'Usikker', merknad: 'Mangler rotkilde' }), mk(3, { riktig: 'F' }), mk(4, { spoersmaal: 'testspørsmål 1?' })])
+    await page.getByRole('button', { name: 'Importer', exact: true }).click()
+    await page.getByLabel('Tema for importerte spørsmål', { exact: false }).fill('test')
+    await page.getByLabel('Innhold').fill(json1)
+    await page.locator('[data-testid="import-oppsummering"]').waitFor()
+    const sum = (await page.locator('[data-testid="import-oppsummering"]').innerText()).replace(/\s+/g, ' ')
+    assert.ok(sum.includes('2 kan importeres') && sum.includes('1 med feil') && sum.includes('1 dubletter'), 'oppsummering: ' + sum)
+    assert.deepStrictEqual(await page.locator('[data-testid="import-rad"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-status'))), ['ok', 'ok', 'feil', 'dublett'])
+    await page.getByText(/Riktig svar mangler/).waitFor()
+    await page.getByRole('checkbox', { name: /Skjul de 1 spørsmålene som er merket Usikker/ }).waitFor()
+    await shot(page, '19-quiz-import')
+    await page.getByRole('button', { name: 'Importer 2 spørsmål' }).click()
+    await page.getByText('Importerte 2 spørsmål (1 usikre er skjult).').waitFor()
+    assert.deepStrictEqual(Z.rows.map((r) => [r.hidden, r.review_status, r.source_level, r.review_note]), [[false, 'ok', 1, null], [true, 'usikker', 3, 'Mangler rotkilde']], 'usikre spørsmål skjules, og kvalitetsfeltene lagres')
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 2)
+    assert.deepStrictEqual(Z.rows.map((r) => [r.theme, r.category, r.correct, r.difficulty]), [['test', 'Test', 1, 'Lett'], ['test', 'Mat', 1, 'Lett']])
+    // samme fil igjen: alt finnes i banken, ingenting å importere
+    await page.getByRole('button', { name: 'Importer', exact: true }).click()
+    await page.getByLabel('Innhold').fill(JSON.stringify([mk(1), mk(2)]))
+    await page.getByText('Finnes i banken').first().waitFor()
+    assert.strictEqual(await page.getByRole('button', { name: 'Importer 0 spørsmål' }).isDisabled(), true)
+    // CSV (tabulator, som fra et regneark)
+    await page.getByLabel('Innhold').fill('spørsmål\tA\tB\tC\tD\triktig\tkategori\tstatus\nTestspørsmål CSV?\tEn\tTo\tTre\tFire\tC\tTall\tUsikker')
+    await page.getByRole('checkbox', { name: /Skjul de 1 spørsmålene som er merket Usikker/ }).uncheck()
+    await page.getByRole('button', { name: 'Importer 1 spørsmål' }).click()
+    await page.getByText('Importerte 1 spørsmål.').waitFor()
+    assert.strictEqual(Z.rows.at(-1).correct, 2)
+    assert.strictEqual(Z.rows.at(-1).hidden, false, 'uten hake skjules ikke usikre')
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 3)
+    // filter på kvalitet
+    await page.getByLabel('Filter kvalitet').selectOption('usikker')
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 2)
+    await page.getByLabel('Filter kvalitet').selectOption('ok')
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 1)
+    await page.getByLabel('Filter kvalitet').selectOption('alle')
+    // søk og filter
+    await page.getByLabel('Søk', { exact: true }).fill('csv')
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 1)
+    await page.getByLabel('Søk', { exact: true }).fill('')
+    await page.getByLabel('Filter kategori').selectOption('Mat')
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 1)
+    await page.getByLabel('Filter kategori').selectOption('')
+    // rediger: validering, og lagring av nytt riktig svar
+    await page.locator('[data-testid="quiz-rad"]').first().getByRole('button').first().click()
+    await page.getByText('A. Ja').waitFor()
+    await page.getByRole('button', { name: 'Rediger' }).click()
+    await page.getByLabel('Alternativ C', { exact: true }).fill('Ja')
+    await page.getByRole('button', { name: 'Lagre', exact: true }).click()
+    await page.getByText('Alternativene må være ulike').waitFor()
+    await page.getByLabel('Alternativ C', { exact: true }).fill('Kanskje')
+    await page.getByLabel('Riktig er alternativ D').check()
+    await page.getByLabel('Spørsmål', { exact: true }).fill('Redigert spørsmål?')
+    await page.getByRole('button', { name: 'Lagre', exact: true }).click()
+    await page.getByText('Spørsmålet er lagret.').waitFor()
+    assert.strictEqual(Z.rows[0].question, 'Redigert spørsmål?'); assert.strictEqual(Z.rows[0].correct, 3)
+    // skjul / vis (raden står fortsatt utvidet etter lagring)
+    const forste = page.locator('[data-testid="quiz-rad"]').first().getByRole('button').first()
+    if ((await forste.getAttribute('aria-expanded')) !== 'true') await forste.click()
+    await page.getByRole('button', { name: 'Skjul', exact: true }).click()
+    await page.getByText('2 skjulte').waitFor()
+    assert.strictEqual(Z.rows[0].hidden, true)
+    await page.getByLabel('Filter skjult').selectOption('skjulte')
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 2)
+    await page.getByLabel('Filter skjult').selectOption('alle')
+    // nytt spørsmål
+    await page.getByRole('button', { name: '+ Nytt spørsmål' }).click()
+    await page.getByLabel('Spørsmål', { exact: true }).fill('Nytt manuelt spørsmål?')
+    for (const [l, v] of [['A', 'Rød'], ['B', 'Blå'], ['C', 'Grønn'], ['D', 'Gul']]) await page.getByLabel('Alternativ ' + l, { exact: true }).fill(v)
+    await page.getByLabel('Riktig er alternativ C').check()
+    await page.getByLabel('Tema', { exact: true }).fill('test')
+    await page.getByRole('button', { name: 'Lagre', exact: true }).click()
+    await page.getByText('Spørsmålet er lagt til.').waitFor()
+    assert.strictEqual(Z.rows.length, 4); assert.strictEqual(Z.rows.at(-1).correct, 2)
+    // eksport
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /Eksporter JSON/ }).click()])
+    assert.strictEqual(dl.suggestedFilename(), 'quiz-sporsmal.json')
+    const exported = JSON.parse(require('fs').readFileSync(await dl.path(), 'utf8'))
+    assert.strictEqual(exported.length, 4); assert.ok(exported[0].alternativer.A && exported[0].riktig && exported[0].spoersmaal)
+    // slett
+    await page.locator('[data-testid="quiz-rad"]').last().getByRole('button').first().click()
+    await page.getByRole('button', { name: 'Slett', exact: true }).click()
+    await page.getByText('Spørsmålet er slettet.').waitFor()
+    assert.strictEqual(Z.rows.length, 3)
+    ok('admin: quiz-spørsmål: import (JSON/CSV) med forhåndsvisning, søk, redigering, skjul, nytt, eksport og slett')
+    await ctx.close()
+  }
   {
     // --- Toppraden med navnet «Konkurranser» passer på smale skjermer (også med Admin-lenke) ---
     const state = freshState({ admin: true })
