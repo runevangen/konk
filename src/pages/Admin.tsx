@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
-  addOption, deleteAllAnswers, deleteEntry, deleteItem, deleteUserAnswers, listCompetitionEntries, deleteOption, listAllFeedback, listAnswers, listCommentEntries, listCompetitions, listItems, listOffices,
-  listOptions, listProfiles, saveCompetition, saveItem, setAnswer, setEntryHidden, setFeedbackHidden,
+  addOption, deleteAllAnswers, deleteEntry, deleteUserAnswers, listCompetitionEntries, deleteOption, listAllFeedback, listCommentEntries, listCompetitions, listItems, listOffices,
+  listOptions, listProfiles, saveCompetition, setEntryHidden, setFeedbackHidden,
 } from '../api/data'
 import { adminDeleteUser, adminResetPin, adminSetPin, errorMessage } from '../api/functions'
 import { useAuth } from '../auth'
-import type { Competition, CompetitionStatus, GuessOption, Id, Item, Profile } from '../api/types'
+import type { Competition, CompetitionStatus, Id, Profile } from '../api/types'
+import GlassTabell from '../components/GlassTabell'
 import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
 import { isValidPin, isWeakPin, normalizePin, validateSlug } from '../lib/validation'
@@ -110,52 +111,12 @@ function CompetitionsTab({ comps, reload, onReset }: { comps: Competition[]; rel
 
 // ---------- Glass og fasit ----------
 function ItemsTab({ comp }: { comp: Competition }) {
-  const data = useAsync(async () => {
-    const [items, options] = await Promise.all([listItems(comp.id), listOptions(comp.id)])
-    const answers = await listAnswers(items.map((i) => i.id))
-    return { items, options, answers: Object.fromEntries(answers.map((a) => [a.item_id, a.correct_option_id])) as Record<Id, Id> }
-  }, [comp.id])
   const { err, run } = useAction()
-  const [label, setLabel] = useState('')
-  const [pos, setPos] = useState('')
-  if (data.loading && !data.data) return <Loading />
-  const { items, options, answers } = data.data ?? { items: [], options: [], answers: {} as Record<Id, Id> }
-  const nextPos = items.length ? Math.max(...items.map((i) => i.position)) + 1 : 1
   return (
     <>
       {err && <div className="on-bg-error" role="alert">{err}</div>}
-      {items.map((i) => <ItemRow key={i.id} item={i} options={options} answer={answers[i.id] ?? ''} run={run} reload={data.reload} />)}
-      <form className="card-alt" onSubmit={(e) => { e.preventDefault(); void run(async () => {
-        await saveItem({ competition_id: comp.id, label: label.trim(), position: Number(pos) || nextPos }); setLabel(''); setPos(''); await data.reload() }) }}>
-        <h2>Legg til glass</h2>
-        <label className="field">Navn/label<input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={`Glass ${nextPos}`} /></label>
-        <label className="field">Posisjon<input type="number" min={1} value={pos} onChange={(e) => setPos(e.target.value)} placeholder={String(nextPos)} /></label>
-        <button className="btn green" disabled={!label.trim()}>Legg til</button>
-      </form>
+      <GlassTabell comp={comp} run={run} />
     </>
-  )
-}
-function ItemRow({ item, options, answer, run, reload }: { item: Item; options: GuessOption[]; answer: Id | ''; run: (f: () => Promise<unknown>) => Promise<void>; reload: () => Promise<void> }) {
-  const [label, setLabel] = useState(item.label)
-  const [pos, setPos] = useState(String(item.position))
-  const [ans, setAns] = useState<Id | ''>(answer)
-  return (
-    <div className="card">
-      <label className="field">Label<input type="text" value={label} onChange={(e) => setLabel(e.target.value)} /></label>
-      <label className="field">Posisjon<input type="number" min={1} value={pos} onChange={(e) => setPos(e.target.value)} /></label>
-      <label className="field">Fasit
-        <select value={ans} onChange={(e) => setAns(e.target.value)}>
-          <option value="">Ikke satt</option>
-          {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </select>
-      </label>
-      <div className="row">
-        <button className="btn small" onClick={() => run(async () => {
-          await saveItem({ id: item.id, competition_id: item.competition_id, label: label.trim(), position: Number(pos) || item.position })
-          await setAnswer(item.id, ans || null); await reload() })}>Lagre</button>
-        <button className="btn ghost small" onClick={() => { if (confirm(`Slette «${item.label}»? Alle svar på glasset forsvinner.`)) void run(async () => { await deleteItem(item.id); await reload() }) }}>Slett</button>
-      </div>
-    </div>
   )
 }
 
