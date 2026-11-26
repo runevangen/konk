@@ -298,3 +298,4 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 @keyframes gift-shake { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
 @keyframes gift-pop { 0% { transform: scale(1.6); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .gift-emoji.shake, .gift-num { animation: none; } }
+.pin-warn { background: #fff3c4; border: 2px solid var(--gold, #e8b84a); border-radius: 12px; padding: 10px 12px; font-size: 1.05rem; }

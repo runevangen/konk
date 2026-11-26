@@ -216,10 +216,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByTestId('pin').waitFor()
     assert.strictEqual(await page.getByTestId('pin').innerText(), '482915')
     assert.strictEqual(state.registered.anonymous, false)
-    assert.strictEqual(await page.getByRole('button', { name: 'Fortsett til Konkurranser' }).isDisabled(), true)
     await shot(page, '02-registrer-pin')
-    await page.getByLabel('Jeg har lagret pinkoden').check()
-    await page.getByRole('button', { name: 'Fortsett til Konkurranser' }).click()
+    await page.getByRole('button', { name: 'Jeg har lagret koden – fortsett' }).click()
     await page.waitForURL(BASE + '/')
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
     // pin skal være borte fra DOM, storage og URL
@@ -1037,22 +1035,49 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
   }
 
   {
-    // --- Ny bruker via quiz-QR: romkoden overlever innlogging -> registrering -> pin ---
-    const state = freshState()
-    const { ctx, page } = await newPage(browser, state)
-    await page.goto(BASE + '/quiz?kode=ABCD')
-    await page.waitForURL('**/login')
-    await page.getByRole('link', { name: 'Ny bruker' }).click()
-    await page.getByLabel('Navn', { exact: true }).fill('Ny Kollega')
-    await page.getByLabel('Kontor').selectOption('of2')
-    await page.getByRole('button', { name: 'Opprett bruker' }).click()
-    await page.getByTestId('pin').waitFor()
-    await page.getByLabel('Jeg har lagret pinkoden').check()
-    await page.getByRole('button', { name: 'Fortsett til Konkurranser' }).click()
-    await page.waitForURL(BASE + '/quiz?kode=ABCD')
-    assert.strictEqual(await page.getByLabel('Romkode').inputValue(), 'ABCD')
-    ok('ny bruker via quiz-lenke: romkoden er ferdig utfylt etter registrering')
-    await ctx.close()
+    // --- QR-flyt: ny bruker og eksisterende bruker kommer rett inn i rommet, uten ekstra trykk ---
+    const lobby = { code: 'ABCD', theme: 'jul', n_questions: 5, seconds: 30, reveal_seconds: 7, is_host: false, is_player: true, status: 'lobby', players: [{ name: 'Kari', office: 'Oslo', host: false, me: true }] }
+    const mkState = () => { const st = freshState(); st.qz = { calls: [], answers: [], state: lobby }; return st }
+    {
+      const state = mkState()
+      const { ctx, page } = await newPage(browser, state)
+      await page.goto(BASE + '/quiz?kode=ABCD')
+      await page.waitForURL('**/login')
+      await page.getByRole('link', { name: 'Ny bruker' }).click()
+      await page.getByLabel('Navn', { exact: true }).fill('Ny Kollega')
+      await page.getByLabel('Kontor').selectOption('of2')
+      await page.getByRole('button', { name: 'Opprett bruker' }).click()
+      await page.getByTestId('pin').waitFor()
+      assert.ok(/skjermbilde/i.test(await page.getByTestId('pin-advarsel').textContent()), 'tydelig skjermbilde-oppfordring')
+      await page.getByRole('button', { name: 'Jeg har lagret koden – til quizen' }).click()
+      await page.getByTestId('quiz-kode').waitFor({ timeout: 5000 })
+      assert.strictEqual(page.url(), BASE + '/quiz/ABCD')
+      assert.strictEqual(state.qz.calls.filter((c) => c.startsWith('konk_quiz_room_join')).length, 1, 'bli med skjer én gang')
+      ok('ny bruker via QR: pin med skjermbilde-oppfordring, «Fortsett til quizen» og rett inn i rommet')
+      await ctx.close()
+    }
+    {
+      const state = mkState()
+      const { ctx, page } = await newPage(browser, state)
+      await page.goto(BASE + '/quiz?kode=ABCD'); await page.waitForURL('**/login')
+      await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+      await page.getByTestId('quiz-kode').waitFor({ timeout: 5000 })
+      assert.strictEqual(page.url(), BASE + '/quiz/ABCD')
+      ok('eksisterende bruker via QR: innlogging og rett inn i rommet')
+      await ctx.close()
+    }
+    {
+      const state = mkState()
+      const { ctx, page } = await newPage(browser, state)
+      await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+      await page.getByRole('heading', { name: /God jul/ }).waitFor()
+      await page.goto(BASE + '/quiz?kode=ZZZZ')
+      await page.getByText('Fant ikke noe rom med den koden.').waitFor({ timeout: 5000 })
+      assert.strictEqual(await page.getByLabel('Romkode').inputValue(), 'ZZZZ')
+      assert.strictEqual(state.qz.calls.filter((c) => c.startsWith('konk_quiz_room_join')).length, 1, 'feil kode forsøkes bare én gang')
+      ok('QR med ugyldig kode: feilmelding og koden står i feltet, ingen gjentatte forsøk')
+      await ctx.close()
+    }
   }
 
   // --- Reduced motion ---

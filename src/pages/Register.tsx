@@ -18,7 +18,6 @@ export default function Register() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pin, setPin] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState<'ok' | 'fail' | null>(null)
   const nav = useNavigate()
   const loc = useLocation()
@@ -57,7 +56,7 @@ export default function Register() {
     return (
       <div className="card">
         <h1>Din pinkode</h1>
-        <p><strong>Dette er første og siste gang du ser koden.</strong> Du trenger den hver gang du logger inn. Lagre den nå, for eksempel i passordbehandleren eller et skjermbilde.</p>
+        <p className="pin-warn" role="note" data-testid="pin-advarsel"><strong>📸 Ta skjermbilde nå!</strong> Dette er første og siste gang du ser koden. Du trenger den hver gang du logger inn, og vi kan ikke vise den igjen.</p>
         <div className="pin-box">
           <div className="pin-code" data-testid="pin" aria-label={`Pinkode: ${pin.split('').join(' ')}`}>{pin}</div>
           <button type="button" className="btn gold" onClick={copy}>Kopier pinkode</button>
@@ -66,11 +65,7 @@ export default function Register() {
             {copied === 'fail' && 'Kunne ikke kopiere. Marker koden og kopier manuelt.'}
           </p>
         </div>
-        <label className="toggle">
-          <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-          <span>Jeg har lagret pinkoden</span>
-        </label>
-        <button className="btn block" disabled={!saved} onClick={done}>Fortsett til Konkurranser</button>
+        <button className="btn block" onClick={done} data-testid="pin-videre">{from.startsWith('/quiz') ? 'Jeg har lagret koden – til quizen' : 'Jeg har lagret koden – fortsett'}</button>
       </div>
     )
   }
