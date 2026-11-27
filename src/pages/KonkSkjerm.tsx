@@ -11,6 +11,8 @@ import { placeLabel } from '../lib/quiz'
 import { tasteProfile } from '../lib/validation'
 
 const POLL_MS = 4000
+/** Koden og QR-koden står på skjermen så lenge; så skjules de, så de ikke ligger fremme hele kvelden. Admin kan vise dem igjen. */
+export const KODE_MINUTTER = 10
 
 /**
  * Storskjerm for en konkurranse (admin). Mens den er åpen: live tavle med kode og QR så flere kan bli med.
@@ -29,6 +31,11 @@ export default function KonkSkjerm() {
   const [admin, setAdmin] = useState<{ items: Item[]; entries: AdminEntry[]; options: GuessOption[]; answers: Record<string, string>; profiles: Profile[] } | null>(null)
   const [sel, setSel] = useState<string | null>(null)
   const [visHemmelig, setVisHemmelig] = useState(false)
+  const [kodeTil, setKodeTil] = useState(() => Date.now() + KODE_MINUTTER * 60000)
+  const [naa, setNaa] = useState(() => Date.now())
+  useEffect(() => { const t = setInterval(() => setNaa(Date.now()), 10000); return () => clearInterval(t) }, [])
+  const kodeSynlig = naa < kodeTil
+  const kodeMinutter = Math.max(1, Math.ceil((kodeTil - naa) / 60000))
 
   useEffect(() => { void getCompetition(slug).then(setComp).catch(() => setComp(null)) }, [slug])
   useEffect(() => { document.title = `Storskjerm ${comp?.title ?? ''} – Konkurranser` }, [comp?.title])
@@ -136,8 +143,18 @@ export default function KonkSkjerm() {
             return hit ? panelFor(sel, { delt: hit.row.avg_score != null && rows.filter((x) => x.rank === hit.rank && x.row.avg_score != null).length > 1, position: hit.row.position, label: admin ? (admin.options.find((o) => o.id === admin.answers[sel])?.label ?? null) : null, rank: hit.row.avg_score != null ? hit.rank : null, avg: hit.row.avg_score, n: hit.row.n, hitRate: hit.row.hit_rate, byOffice: hit.row.by_office }) : null
           })()}
           {!sel && <aside className="skjerm-side">
-            <div className="skjerm-qrboks"><Qr code={comp.code} /><p className="skjerm-label"><strong>Skann for å bli med</strong></p></div>
-            <div className="skjerm-code skjerm-code-liten" data-testid="skjerm-kode">{comp.code}</div>
+            {kodeSynlig ? (
+              <>
+                <div className="skjerm-qrboks"><Qr code={comp.code} /><p className="skjerm-label"><strong>Skann for å bli med</strong></p></div>
+                <div className="skjerm-code skjerm-code-liten" data-testid="skjerm-kode">{comp.code}</div>
+                <p className="skjerm-label" style={{ fontSize: '.8em', opacity: .7, margin: 0 }} data-testid="skjerm-kode-tid">Koden skjules om {kodeMinutter} min</p>
+              </>
+            ) : (
+              <div className="skjerm-kode-skjult" data-testid="skjerm-kode-skjult">
+                <p className="skjerm-label" style={{ margin: '0 0 8px' }}>🔒 Koden er skjult.</p>
+                <button className="btn gold small" onClick={() => { setKodeTil(Date.now() + KODE_MINUTTER * 60000); setNaa(Date.now()) }} data-testid="vis-kode">Vis koden i {KODE_MINUTTER} min</button>
+              </div>
+            )}
             {board && (
               <>
                 <p className="skjerm-label" data-testid="skjerm-deltakere">{pluralize(board.overall.participants, 'deltaker', 'deltakere')} · {pluralize(board.overall.n_entries, 'svar', 'svar')}</p>
