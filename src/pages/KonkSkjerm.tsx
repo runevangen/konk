@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getCompetition, getLiveBoard, getResults } from '../api/data'
+import { getCompetition, getLiveBoard, getResults, listAnswers, listCompetitionEntries, listItems, listOptions, listProfiles, type AdminEntry } from '../api/data'
 import { ApiError } from '../api/client'
-import type { Competition, LiveBoard, Results, ResultsItem } from '../api/types'
+import type { Competition, GuessOption, Item, LiveBoard, Profile, Results, ResultsItem } from '../api/types'
+import { GlassPanel } from '../components/GlassPanel'
 import { Qr } from '../components/Qr'
 import { Loading } from '../components/ui'
 import { formatPercent, formatScore, pluralize, rankBy, scoreBarWidth } from '../lib/format'
@@ -23,6 +24,10 @@ export default function KonkSkjerm() {
   const [results, setResults] = useState<Results | null>(null)
   const [step, setStep] = useState(0)
   const [err, setErr] = useState<string | null>(null)
+  // Admin ser alle svar (RLS), så skjermen kan vise fordeling, gjetninger, smak og kommentarer per glass.
+  const [admin, setAdmin] = useState<{ items: Item[]; entries: AdminEntry[]; options: GuessOption[]; answers: Record<string, string>; profiles: Profile[] } | null>(null)
+  const [sel, setSel] = useState<string | null>(null)
+  const [visHemmelig, setVisHemmelig] = useState(false)
 
   useEffect(() => { void getCompetition(slug).then(setComp).catch(() => setComp(null)) }, [slug])
   useEffect(() => { document.title = `Storskjerm ${comp?.title ?? ''} – Konkurranser` }, [comp?.title])
@@ -30,6 +35,14 @@ export default function KonkSkjerm() {
 
   const closed = comp?.status === 'closed'
 
+  const loadAdmin = useCallback(async (id: string) => {
+    try {
+      const items = await listItems(id)
+      const ids = items.map((i) => i.id)
+      const [entries, options, answers, profiles] = await Promise.all([listCompetitionEntries(ids), listOptions(id), listAnswers(ids), listProfiles()])
+      setAdmin({ items, entries, options, answers: Object.fromEntries(answers.map((a) => [a.item_id, a.correct_option_id])), profiles })
+    } catch { /* uten admin-data vises bare det som tavlen alt har */ }
+  }, [])
   const pollBoard = useCallback(async (id: string) => {
     try { setBoard(await getLiveBoard(id)); setLiveOff(false); setErr(null) } catch (e) {
       if (e instanceof ApiError && e.code === 'live_off') setLiveOff(true); else setErr('Fikk ikke hentet tavlen. Prøver igjen …')
@@ -38,11 +51,11 @@ export default function KonkSkjerm() {
   useEffect(() => {
     if (!comp) return
     let stop = false
-    const tick = () => { if (!stop && !document.hidden) void pollBoard(comp.id) }
+    const tick = () => { if (!stop && !document.hidden) { void pollBoard(comp.id); void loadAdmin(comp.id) } }
     tick()
     const t = setInterval(tick, closed ? 30000 : POLL_MS)
     return () => { stop = true; clearInterval(t) }
-  }, [comp, closed, pollBoard])
+  }, [comp, closed, pollBoard, loadAdmin])
   // Resultatene hentes når konkurransen er avsluttet.
   useEffect(() => {
     if (!comp || !closed) return
@@ -59,12 +72,35 @@ export default function KonkSkjerm() {
   useEffect(() => {
     if (!closed) return
     const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setSel(null); return }
+      if ((e.target as HTMLElement | null)?.getAttribute?.('role') === 'button' && (e.key === 'Enter' || e.key === ' ')) return   // rader i oppsummeringen håndterer det selv
       if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter' || e.key === 'PageDown') { e.preventDefault(); next() }
       if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); back() }
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [closed, next, back])
+
+  const liveRows = useMemo(() => (board ? rankBy(board.items, (i) => i.avg_score) : []), [board])
+  const visAlt = closed || visHemmelig || !!board?.names
+  const officeName = (id: string | number | null) => board?.offices.find((o) => String(o.office_id) === String(id))?.name ?? results?.offices.find((o) => String(o.office_id) === String(id))?.name ?? ''
+  const panelFor = (itemId: string, base: { position: number; label: string | null; rank: number | null; avg: number | null; n: number; hitRate: number | null; byOffice: { office_id: string | number; name: string; avg_score: number | null; n: number }[] }) => (
+    <GlassPanel {...base} entries={(admin?.entries ?? []).filter((e) => e.item_id === itemId)} options={admin?.options ?? []} correctId={admin?.answers[itemId]}
+      profiles={admin?.profiles ?? []} officeName={officeName} reveal={visAlt} canToggle={!closed} onToggle={() => setVisHemmelig((v) => !v)} onClose={() => setSel(null)} />
+  )
+  useEffect(() => {
+    if (closed) return
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setSel(null); return }
+      if (!sel || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return
+      e.preventDefault()
+      const i = liveRows.findIndex((r) => r.row.item_id === sel)
+      const j = Math.min(liveRows.length - 1, Math.max(0, i + (e.key === 'ArrowRight' ? 1 : -1)))
+      if (liveRows[j]) setSel(liveRows[j].row.item_id)
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [closed, sel, liveRows])
 
   const wrap = (c: React.ReactNode) => <div className="skjerm" data-testid="konk-skjerm">{c}</div>
   if (comp === undefined) return wrap(<Loading />)
@@ -85,14 +121,20 @@ export default function KonkSkjerm() {
             {liveOff && <p className="skjerm-label">Live tavlen er ikke slått på for denne konkurransen.</p>}
             {board && board.overall.n_entries === 0 && <p className="skjerm-label">Ingen har gitt poeng ennå. Tavlen fylles ut etter hvert.</p>}
             {rows.map(({ rank, row }) => (
-              <div key={row.item_id} className="skjerm-bar" data-testid="skjerm-glass">
-                <span className="skjerm-bar-label"><span className="skjerm-rank">{row.avg_score != null ? rank : '·'}</span>Glass {row.position}{names && row.brus ? ` – ${row.brus}` : ''}</span>
+              <button key={row.item_id} type="button" className={`skjerm-bar klikkbar ${sel === row.item_id ? 'valgt' : ''}`} data-testid="skjerm-glass" aria-pressed={sel === row.item_id}
+                onClick={() => setSel(sel === row.item_id ? null : row.item_id)}>
+                <span className="skjerm-bar-label"><span className="skjerm-rank">{row.avg_score != null ? rank : '·'}</span>Glass {row.position}{(names || visAlt) && row.brus ? ` – ${row.brus}` : ''}</span>
                 <span className="skjerm-bar-track" aria-hidden="true"><i style={{ width: `${scoreBarWidth(row.avg_score)}%` }} /></span>
                 <strong className="skjerm-bar-val">{row.avg_score != null ? formatScore(row.avg_score, 2) : '–'}</strong>
-              </div>
+              </button>
             ))}
+            <p className="skjerm-label" style={{ fontSize: '.8em', opacity: .7 }}>Trykk på et glass for detaljer</p>
           </div>
-          <aside className="skjerm-side">
+          {sel && (() => {
+            const hit = rows.find((r) => r.row.item_id === sel)
+            return hit ? panelFor(sel, { position: hit.row.position, label: admin ? (admin.options.find((o) => o.id === admin.answers[sel])?.label ?? null) : null, rank: hit.row.avg_score != null ? hit.rank : null, avg: hit.row.avg_score, n: hit.row.n, hitRate: hit.row.hit_rate, byOffice: hit.row.by_office }) : null
+          })()}
+          {!sel && <aside className="skjerm-side">
             <div className="skjerm-qrboks"><Qr code={comp.code} /><p className="skjerm-label"><strong>Skann for å bli med</strong></p></div>
             <div className="skjerm-code skjerm-code-liten" data-testid="skjerm-kode">{comp.code}</div>
             {board && (
@@ -106,7 +148,7 @@ export default function KonkSkjerm() {
               </>
             )}
             {err && <p className="skjerm-label">{err}</p>}
-          </aside>
+          </aside>}
         </div>
       </>,
     )
@@ -139,7 +181,7 @@ export default function KonkSkjerm() {
     const { rank, row } = reveal[step - 1]
     return wrap(<><RevealGlass rank={rank} row={row} comments={results.comments} isWinner={rank === 1} />{controls}</>)
   }
-  return wrap(<><Summary results={results} ranked={ranked} board={liveOff ? null : board} /> {controls}</>)
+  return wrap(<><Summary results={results} ranked={ranked} board={liveOff ? null : board} sel={sel} onSel={setSel} panelFor={panelFor} /> {controls}</>)
 }
 
 function RevealGlass({ rank, row, comments, isWinner }: { rank: number; row: ResultsItem; comments: Results['comments']; isWinner: boolean }) {
@@ -173,7 +215,8 @@ function RevealGlass({ rank, row, comments, isWinner }: { rank: number; row: Res
   )
 }
 
-function Summary({ results, ranked, board }: { results: Results; ranked: { rank: number; row: ResultsItem }[]; board: LiveBoard | null }) {
+type PanelBase = { position: number; label: string | null; rank: number | null; avg: number | null; n: number; hitRate: number | null; byOffice: { office_id: string | number; name: string; avg_score: number | null; n: number }[] }
+function Summary({ results, ranked, board, sel, onSel, panelFor }: { results: Results; ranked: { rank: number; row: ResultsItem }[]; board: LiveBoard | null; sel: string | null; onSel: (id: string | null) => void; panelFor: (itemId: string, base: PanelBase) => React.ReactNode }) {
   const people = board ? rankBy(board.people.filter((p) => p.guesses > 0), (p) => p.hits).slice(0, 10) : []
   const offices = results.offices
   const quotes = useMemo(() => {
@@ -195,7 +238,8 @@ function Summary({ results, ranked, board }: { results: Results; ranked: { rank:
           <h2>Topp 10</h2>
           <ol className="rank-list compact" aria-label="Glass etter snitt">
             {ranked.slice(0, 10).map(({ rank, row }) => (
-              <li key={row.item_id} className="rank-row big" data-testid="skjerm-topp">
+              <li key={row.item_id} className={`rank-row big klikkbar-rad ${sel === row.item_id ? 'valgt' : ''}`} data-testid="skjerm-topp" role="button" tabIndex={0} aria-pressed={sel === row.item_id}
+                onClick={() => onSel(sel === row.item_id ? null : row.item_id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSel(sel === row.item_id ? null : row.item_id) } }}>
                 <span className="rank-n">{rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}</span>
                 <span className="rank-name"><strong>{row.correct_label ?? `Glass ${row.position}`}</strong> <span className="soft small">· glass {row.position}</span></span>
                 <span className="rank-pts"><strong>{formatScore(row.avg_score, 2)}</strong></span>
@@ -203,7 +247,11 @@ function Summary({ results, ranked, board }: { results: Results; ranked: { rank:
             ))}
           </ol>
         </div>
-        <div>
+        {sel && (() => {
+          const hit = ranked.find((r) => r.row.item_id === sel)
+          return hit ? panelFor(sel, { position: hit.row.position, label: hit.row.correct_label, rank: hit.rank, avg: hit.row.avg_score, n: hit.row.n, hitRate: hit.row.hit_rate, byOffice: hit.row.by_office }) : null
+        })()}
+        {!sel && <div>
           {offices.length > 0 && (<><h2>Kontorene</h2>{offices.map((o) => <p key={o.office_id} className="skjerm-label" style={{ margin: '2px 0' }} data-testid="skjerm-kontor"><strong>{o.name}</strong>{' '}{o.participants > 0 ? `snitt ${formatScore(o.avg_score, 2)} · ${formatPercent(o.hit_rate)} riktige` : 'ingen svar'}</p>)}</>)}
           {people.length > 0 && (
             <>
@@ -215,9 +263,9 @@ function Summary({ results, ranked, board }: { results: Results; ranked: { rank:
               </ol>
             </>
           )}
-        </div>
+        </div>}
       </div>
-      {q && (
+      {q && !sel && (
         <blockquote className="quote skjerm-sitat" key={qi} data-testid="skjerm-kommentar">«{q.comment}»
           <div className="who">{q.featured ? '⭐ Dagens sitat · ' : ''}{q.display_name ?? 'Anonym'} · {q.office_name}</div>
         </blockquote>

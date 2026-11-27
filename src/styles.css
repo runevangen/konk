@@ -369,3 +369,30 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .option-list span { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .option-list span .used { font: 600 .8rem system-ui, sans-serif; opacity: .85; white-space: nowrap; background: rgba(30,110,62,.14); border-radius: 999px; padding: 2px 10px; }
 .option-list span.on .used { background: rgba(255,255,255,.22); }
+
+/* Glass-panel på storskjermen */
+.glasspanel { max-height: calc(100vh - 130px); overflow: hidden; font-size: .95em; }
+.glasspanel h3 { font-size: 1.45em; }
+.glasspanel .hist { display: flex; align-items: flex-end; gap: 5px; height: 84px; margin: 6px 0 26px; }
+.glasspanel .hist b { flex: 1; background: var(--green); border-radius: 4px 4px 0 0; position: relative; min-height: 2px; }
+.glasspanel .hist b span { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: .75em; color: var(--soft); font-weight: 600; }
+.glasspanel .g { display: grid; grid-template-columns: 11em 1fr 2em; gap: 8px; align-items: center; margin: 4px 0; }
+.glasspanel .g .t { height: 14px; background: #e6dfc9; border-radius: 99px; overflow: hidden; }
+.glasspanel .g .t i { display: block; height: 100%; background: #9aa79f; }
+.glasspanel .g.ok .t i { background: var(--green); }
+.glasspanel .chip { background: #fff; border: 1px solid var(--border-strong); border-radius: 999px; padding: 2px 12px; margin: 0 6px 6px 0; display: inline-block; font-weight: 700; font-size: .9em; }
+.glasspanel .quote { margin: 6px 0; font-size: 1em; padding: 6px 12px; }
+.glasspanel .quote small { display: block; font: .75em system-ui, sans-serif; opacity: .75; }
+.panel-lås { background: #f1ecd9; border-radius: 10px; padding: 12px; margin-top: 14px; }
+.skjerm-bar.klikkbar { width: 100%; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 10px; padding: 3px 6px; margin: 4px -6px; }
+.skjerm-bar.klikkbar:hover { background: rgba(255,255,255,.07); }
+.skjerm-bar.valgt { background: rgba(232,184,74,.18); outline: 2px solid var(--gold); }
+.rank-row.klikkbar-rad { cursor: pointer; border-radius: 8px; }
+.rank-row.klikkbar-rad:hover { background: rgba(255,255,255,.07); }
+.rank-row.klikkbar-rad.valgt { background: rgba(232,184,74,.18); outline: 2px solid var(--gold); }
+/* Panelet har lys bakgrunn på en mørk skjerm: tekst og knapper må ha mørk farge */
+.skjerm .glasspanel { color: var(--ink); }
+.skjerm .glasspanel .soft, .skjerm .glasspanel .small { color: var(--soft); }
+.skjerm .glasspanel h3 { color: var(--red); }
+.skjerm .glasspanel .btn.ghost { color: var(--ink); border-color: var(--border-strong); background: transparent; }
+.skjerm .glasspanel .quote small { color: var(--soft); }
