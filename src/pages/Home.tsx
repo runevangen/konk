@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { isCode, normalizeCode } from '../lib/quiz'
-import { countItems, deleteCompetition, regenCompetitionCode, listCompetitions, myProgress, saveCompetitionOrder, setCompetitionVisible } from '../api/data'
+import { countItems, deleteCompetition, regenCompetitionCode, setCompetitionCode, listCompetitions, myProgress, saveCompetitionOrder, setCompetitionVisible } from '../api/data'
 import { errorMessage } from '../api/functions'
 import { moveInOrder } from '../lib/competitionOrder'
 import type { Competition } from '../api/types'
@@ -29,6 +29,9 @@ export default function Home() {
   const [manage, setManage] = useState(false)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [typed, setTyped] = useState('')
+  const [editCode, setEditCode] = useState<string | null>(null)
+  const [codeInput, setCodeInput] = useState('')
+  const [codeErr, setCodeErr] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function run(fn: () => Promise<void>, okText?: string) {
@@ -47,6 +50,20 @@ export default function Home() {
     if (!data) return
     setData(data.map((r) => (r.c.id === id ? { ...r, c: { ...r.c, visible } } : r)))
     void run(() => setCompetitionVisible(id, visible), visible ? 'Konkurransen er synlig for alle.' : 'Konkurransen er nå skjult fra forsiden. Den er bare tilgjengelig med kode.')
+  }
+  const setCode = (id: string, code: string) => { setData((data ?? []).map((r) => (r.c.id === id ? { ...r, c: { ...r.c, code } } : r))) }
+  async function saveCode(id: string) {
+    setCodeErr(null)
+    if (!isCode(codeInput)) { setCodeErr('Koden må være fire bokstaver (A–Z).'); return }
+    try {
+      const r = await setCompetitionCode(id, codeInput)
+      if ('ok' in r) { setCode(id, r.code); setEditCode(null); setMsg({ ok: true, text: `Koden er nå ${r.code}.` }) }
+      else setCodeErr(r.error === 'in_use' ? 'Den koden er i bruk. Velg en annen.' : r.error === 'invalid' ? 'Koden må være fire bokstaver (A–Z).' : 'Fant ikke konkurransen.')
+    } catch (e) { setCodeErr(errorMessage(e)) }
+  }
+  async function randomCode(id: string) {
+    setCodeErr(null)
+    try { const c = await regenCompetitionCode(id); setCode(id, c); setEditCode(null); setMsg({ ok: true, text: `Ny kode: ${c}.` }) } catch (e) { setCodeErr(errorMessage(e)) }
   }
   const remove = (id: string, title: string) => {
     void run(async () => { await deleteCompetition(id); setData((data ?? []).filter((r) => r.c.id !== id)); setConfirmId(null); setTyped('') }, `«${title}» er slettet.`)
@@ -83,14 +100,34 @@ export default function Home() {
       {data?.map(({ c, done, total }, idx) => (
         <div key={c.id} className={`card ${c.visible ? '' : 'dim'}`} data-testid="konkurranse-kort">
           {isAdmin && !c.visible && <p className="badge" style={{ marginTop: 0 }} data-testid="usynlig-merke">Bare med kode</p>}
+          {isAdmin && (
+            <div className="admin-rad" data-testid="admin-rad">
+              {editCode === c.id ? (
+                <div className="kode-editor">
+                  <label className="field" htmlFor={`kode-${c.id}`} style={{ margin: 0 }}>Romkode (fire bokstaver)</label>
+                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    <input id={`kode-${c.id}`} className="pin" value={codeInput} onChange={(e) => setCodeInput(normalizeCode(e.target.value))} maxLength={4} autoCapitalize="characters" autoComplete="off" spellCheck={false}
+                      style={{ letterSpacing: '.3em', textAlign: 'center', fontWeight: 700, width: '8em' }} />
+                    <button className="btn green small" onClick={() => void saveCode(c.id)} disabled={!isCode(codeInput)}>Lagre</button>
+                    <button className="btn ghost small" onClick={() => void randomCode(c.id)}>🎲 Tilfeldig</button>
+                    <button className="btn ghost small" onClick={() => { setEditCode(null); setCodeErr(null) }}>Avbryt</button>
+                  </div>
+                  {codeErr && <p className="error" role="alert" style={{ margin: '6px 0 0' }}>{codeErr}</p>}
+                </div>
+              ) : (
+                <>
+                  <span className="badge" title="Romkode" data-testid="romkode">Kode {c.code}</span>
+                  <button className="btn ghost small" onClick={() => { setEditCode(c.id); setCodeInput(c.code); setCodeErr(null) }}>✏️ Endre kode</button>
+                  <Link className="btn ghost small" to={`/k/${c.slug}/skjerm`} target="_blank" rel="noreferrer" data-testid="storskjerm-lenke">📺 Storskjerm</Link>
+                </>
+              )}
+            </div>
+          )}
           {isAdmin && manage && (
             <div className="manage-bar" role="group" aria-label={`Administrer ${c.title}`}>
               <button className="btn ghost small" onClick={() => move(c.id, -1)} disabled={idx === 0} aria-label={`Flytt ${c.title} opp`}>▲</button>
               <button className="btn ghost small" onClick={() => move(c.id, 1)} disabled={idx === data.length - 1} aria-label={`Flytt ${c.title} ned`}>▼</button>
-              <span className="badge" title="Romkode" data-testid="romkode">Kode {c.code}</span>
-              <Link className="btn ghost small" to={`/k/${c.slug}/skjerm`} target="_blank" rel="noreferrer">📺 Storskjerm</Link>
               <button className="btn ghost small" onClick={() => toggleVisible(c.id, !c.visible)} aria-pressed={c.visible}>{c.visible ? '👁 Synlig' : '🔑 Bare med kode'}</button>
-              <button className="btn ghost small" onClick={() => { if (confirm('Lage en ny kode? Den gamle slutter å virke.')) void run(async () => { const nyKode = await regenCompetitionCode(c.id); setData((data ?? []).map((r) => (r.c.id === c.id ? { ...r, c: { ...r.c, code: nyKode } } : r))) }, 'Ny kode er laget.') }}>Ny kode</button>
               <button className="btn ghost small danger" onClick={() => { setConfirmId(confirmId === c.id ? null : c.id); setTyped('') }}>🗑 Slett</button>
             </div>
           )}
