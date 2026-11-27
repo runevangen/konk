@@ -1442,6 +1442,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('heading', { name: /Glass 4 av 6/ }).waitFor({ timeout: 8000 })
     assert.strictEqual(await page.locator('#glass-h').innerText(), 'Glass 4 av 6', 'ingen «– Glass 4» etter tittelen')
     assert.ok(await page.locator('.glass-band').isVisible() && /Score/.test(await page.locator('.edit-section legend').first().innerText()), 'samme kort som i Mine svar')
+    assert.ok(/1 = dårlig, 10 = fantastisk/.test(await page.locator('.edit-section').first().innerText()), 'forklaringen under score-valgene')
+    assert.ok(!/uspiselig/.test(await page.locator('main, #root').first().innerText()))
     await page.goto(BASE + '/k/julebrustest?glass=1')
     await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor()
     ok('glass for glass: nytt kortutseende, starter på første ubesvarte, ren tittel')

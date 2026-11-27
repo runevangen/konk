@@ -178,7 +178,7 @@ export default function Mine() {
             </header>
             <fieldset className="edit-section">
               <legend>Score</legend>
-              <p className="soft small" style={{ margin: '0 0 6px' }}>{SCORE_MIN} = uspiselig, {SCORE_MAX} = perfekt</p>
+              <p className="soft small" style={{ margin: '0 0 6px' }}>{SCORE_MIN} = dårlig, {SCORE_MAX} = fantastisk</p>
               <div className="score-grid" role="radiogroup" aria-label={`Score for glass ${i + 1}`}>
                 {Array.from({ length: SCORE_MAX }, (_, k) => k + 1).map((n) => (
                   <label key={n}>
