@@ -243,3 +243,13 @@ export async function setQuizHidden(ids: Id[], hidden: boolean) {
 export async function deleteQuizQuestions(ids: Id[]) {
   if (ids.length) check(await supabase.from('konk_quiz_questions').delete().in('id', ids))
 }
+
+/** Skal quiz-kortet vises på forsiden? Standard ja (også hvis innstillingen mangler). */
+export async function getQuizOnHome(): Promise<boolean> {
+  const row = check(await supabase.from('konk_settings').select('value').eq('key', 'quiz_on_home').maybeSingle()) as { value: unknown } | null
+  return row ? row.value !== false : true
+}
+/** Admin: vis eller skjul quiz-kortet på forsiden for alle. Quiz fungerer fortsatt med kode. */
+export async function setQuizOnHome(on: boolean) {
+  check(await supabase.from('konk_settings').upsert({ key: 'quiz_on_home', value: on, updated_at: new Date().toISOString() }, { onConflict: 'key' }))
+}
