@@ -143,6 +143,7 @@ function makeBackend(state) {
       if (req.method() === 'HEAD') return route.fulfill({ status: 200, headers: { 'content-range': `0-0/${ITEMS.length}`, 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range' } })
       return json(ITEMS)
     }
+    if (state.answers && p.endsWith('/rest/v1/konk_item_answers')) return json(state.answers)
     if (p.endsWith('/rest/v1/konk_guess_options')) return json(OPTIONS)
     if (p.endsWith('/rest/v1/konk_entries')) {
       if (req.method() === 'DELETE') {
@@ -1482,6 +1483,68 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.ok(/Oslo/.test(k[0]) && /snitt/.test(k[0]) && /Stavanger/.test(k[1]) && /ingen svar ennå/.test(k[1]))
     ok('storskjerm: kontor uten svar vises med «ingen svar ennå»')
     await ctx.close()
+  }
+
+  {
+    // --- Storskjerm: trykk på et glass for fordeling, gjetninger, smak og kommentarer (admin) ---
+    const mkE = (id, user, item, score, guess, comment, tags, featured) => [id, { id, user_id: user, item_id: item, score, guess_option_id: guess, comment, tags, hidden: false, featured: !!featured }]
+    const entries = Object.fromEntries([
+      mkE('a1', UID, 'i1', 9, 'o2', 'Myk og fin', ['Søt', 'Krydret'], true), mkE('a2', 'u2', 'i1', 8, 'o3', null, ['Søt']), mkE('a3', 'u3', 'i1', 10, 'o2', null, []),
+      mkE('a4', UID, 'i2', 5, 'o2', null, []),
+    ])
+    const profiles = [{ id: UID, display_name: 'Kari Nordmann', office_id: 'of1', anonymous: false, is_admin: true }, { id: 'u2', display_name: 'Ola', office_id: 'of2', anonymous: true, is_admin: false }, { id: 'u3', display_name: 'Per', office_id: 'of1', anonymous: false, is_admin: false }]
+    const vp = { viewport: { width: 1280, height: 720 }, isMobile: false, hasTouch: false }
+    const login = async (page) => { await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click(); await page.getByRole('heading', { name: /God jul/ }).waitFor() }
+    const fit = async (page, hva) => assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, `passer på 1280x720: ${hva}`)
+    {
+      const state = freshState({ admin: true, status: 'open', entries }); state.answers = [{ item_id: 'i1', correct_option_id: 'o2' }]; state.profileList = profiles
+      const { ctx, page } = await newPage(browser, state, vp)
+      await login(page)
+      await page.goto(BASE + '/k/julebrustest/skjerm')
+      await page.getByTestId('skjerm-glass').nth(1).waitFor()
+      for (let k = 0; k < 30; k++) { if (state.calls.some((c) => c.includes('konk_item_answers'))) break; await page.waitForTimeout(100) }
+      await page.getByTestId('skjerm-glass').nth(1).click()                 // Glass 1 (nest øverst: Glass 2 har høyest snitt)
+      await page.getByTestId('glass-panel').waitFor()
+      assert.ok(/Glass 1/.test(await page.getByTestId('glass-panel').innerText()))
+      assert.strictEqual(await page.getByTestId('panel-histogram').locator('b').count(), 10)
+      assert.strictEqual(await page.getByTestId('panel-lås').count(), 1, 'gjetninger og kommentarer er låst mens smakingen pågår')
+      assert.strictEqual(await page.getByTestId('panel-gjetning').count(), 0)
+      assert.ok(!/Julebrus A/.test(await page.getByTestId('glass-panel').innerText()), 'fasit røpes ikke før admin viser den')
+      await fit(page, 'panel låst')
+      await page.getByTestId('panel-vis').click()
+      await page.getByTestId('panel-gjetning').first().waitFor()
+      const g = await page.getByTestId('panel-gjetning').allInnerTexts()
+      assert.ok(/✓ Julebrus A/.test(g[0]) && /2/.test(g[0]), 'riktig svar er markert og flest først')
+      assert.ok(/Julebrus B/.test(g[1]))
+      assert.ok(/Søt 2/.test(await page.getByTestId('panel-smak').innerText()))
+      assert.ok(/Dagens sitat/.test(await page.getByTestId('panel-kommentar').innerText()) && /Kari Nordmann · Oslo/.test(await page.getByTestId('panel-kommentar').innerText()))
+      assert.ok(/Julebrus A/.test(await page.getByTestId('glass-panel').locator('h3').innerText()), 'fasit i tittelen når den vises')
+      await fit(page, 'panel åpnet'); await shot(page, '46-konk-skjerm-panel')
+      await page.keyboard.press('ArrowLeft')                                  // forrige glass i lista (Glass 2)
+      await page.getByRole('heading', { name: /Glass 2/ }).waitFor()
+      await page.keyboard.press('Escape')
+      await page.getByTestId('glass-panel').waitFor({ state: 'detached' })
+      await page.getByTestId('skjerm-kode').waitFor()                         // QR og kode er tilbake
+      await ctx.close()
+    }
+    {
+      const state = freshState({ admin: true, status: 'closed', entries }); state.answers = [{ item_id: 'i1', correct_option_id: 'o2' }]; state.profileList = profiles
+      const { ctx, page } = await newPage(browser, state, vp)
+      await login(page)
+      await page.goto(BASE + '/k/julebrustest/skjerm')
+      await page.getByText('Nå avslører vi resultatet').waitFor()
+      for (let k = 0; k < 7; k++) await page.keyboard.press('ArrowRight')
+      await page.getByTestId('skjerm-oppsummering').waitFor()
+      await page.getByTestId('skjerm-topp').nth(1).click()                    // Glass 1 er nr. 2 i lista
+      await page.getByTestId('glass-panel').waitFor()
+      assert.strictEqual(await page.getByTestId('panel-lås').count(), 0, 'avsluttet: alt vises')
+      assert.ok(/✓ Julebrus A/.test((await page.getByTestId('panel-gjetning').allInnerTexts())[0]))
+      await fit(page, 'oppsummering med panel')
+      await page.keyboard.press('Escape')
+      await page.getByTestId('glass-panel').waitFor({ state: 'detached' })
+      await ctx.close()
+    }
+    ok('storskjerm: trykk på glass gir panel med fordeling, gjetninger, smak og kommentarer; skjult til admin viser; piltast og Esc')
   }
 
   // --- Reduced motion ---

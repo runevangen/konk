@@ -173,11 +173,11 @@ export async function setFeedbackHidden(id: Id, hidden: boolean) {
 }
 
 // ---- admin: slett svar ----
-export interface AdminEntry { id: Id; item_id: Id; user_id: Id; score: number | null; guess_option_id: Id | null; comment: string | null; hidden: boolean }
+export interface AdminEntry { id: Id; item_id: Id; user_id: Id; score: number | null; guess_option_id: Id | null; comment: string | null; hidden: boolean; tags: string[]; featured: boolean }
 export async function listCompetitionEntries(itemIds: Id[]) {
   if (!itemIds.length) return [] as AdminEntry[]
   return check(
-    await supabase.from('konk_entries').select('id,item_id,user_id,score,guess_option_id,comment,hidden').in('item_id', itemIds),
+    await supabase.from('konk_entries').select('id,item_id,user_id,score,guess_option_id,comment,hidden,tags,featured').in('item_id', itemIds),
   ) as AdminEntry[]
 }
 /** Sletter ett svar. Kaster hvis ingenting ble slettet (f.eks. manglende tilgang). */
