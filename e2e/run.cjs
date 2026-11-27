@@ -1608,6 +1608,37 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await ctx.close()
   }
 
+  {
+    // --- Admin: redigering åpnes ved kortet som redigeres, ikke nederst ---
+    const state = freshState({ admin: true }); state.comps = [
+      { ...COMP, id: 'c1', slug: 'a', title: 'Konkurranse A', visible: true, sort_order: 10, code: 'AAAA' },
+      { ...COMP, id: 'c2', slug: 'b', title: 'Konkurranse B', visible: true, sort_order: 20, code: 'BBBB' },
+      { ...COMP, id: 'c3', slug: 'c', title: 'Konkurranse C', visible: true, sort_order: 30, code: 'CCCC' },
+    ]
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/admin'); await page.getByText('/b ·').waitFor()
+    await page.getByRole('button', { name: 'Rediger' }).nth(1).click()          // Konkurranse B (nr. 2)
+    await page.getByTestId('rediger-skjema').waitFor()
+    const y = async (loc) => (await loc.boundingBox()).y
+    const yA = await y(page.getByText('/a ·')), yForm = await y(page.getByTestId('rediger-skjema')), yC = await y(page.getByText('/c ·'))
+    assert.ok(yA < yForm && yForm < yC, `skjemaet står mellom A og C, der B var (A ${yA}, skjema ${yForm}, C ${yC})`)
+    assert.strictEqual(await page.getByText('/b ·').count(), 0, 'kortet som redigeres er erstattet av skjemaet')
+    assert.strictEqual(await page.getByTestId('rediger-skjema').count(), 1, 'bare ett skjema')
+    await page.getByLabel('Tittel').fill('Konkurranse B2')
+    await page.getByRole('button', { name: 'Lagre', exact: true }).click()
+    await page.getByText('/b ·').waitFor()
+    assert.strictEqual(state.comps[1].title, 'Konkurranse B2')
+    await page.getByText('Konkurranse B2').first().waitFor()
+    // ny konkurranse åpnes nederst, som før
+    await page.getByRole('button', { name: '+ Ny konkurranse' }).click()
+    await page.getByTestId('rediger-skjema').waitFor()
+    assert.ok(await y(page.getByTestId('rediger-skjema')) > (await y(page.getByText('/c ·'))), 'ny konkurranse åpnes under de andre')
+    ok('admin: redigering åpnes ved kortet som redigeres (ny konkurranse nederst)')
+    await ctx.close()
+  }
+
   // --- Reduced motion ---
   {
     const state = freshState()
