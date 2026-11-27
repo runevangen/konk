@@ -304,3 +304,20 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .skjerm-qrboks .skjerm-label { margin: 2px 0 0; }
 .skjerm-qr { width: min(48vh, 400px); padding: 10px; border-radius: 14px; }
 .skjerm-code { font-size: clamp(3rem, 17vh, 8rem); }
+
+/* Mine svar: rediger-modus */
+.edit-card { padding: 0; overflow: hidden; }
+.edit-card.bad { outline: 3px solid var(--red); }
+.glass-band { display: flex; align-items: baseline; gap: 8px; background: var(--red); color: var(--on-red); padding: 10px 14px; }
+.glass-band h2 { margin: 0; color: inherit; font-size: 1.35rem; }
+.glass-band .badge { margin-left: auto; background: #fff3c4; color: #5a4300; }
+.edit-section { padding: 12px 14px; border-top: 1px solid var(--border-strong); margin: 0; }
+.edit-section:first-of-type { border-top: 0; }
+.edit-section legend { font-weight: 700; padding: 0; }
+.edit-card .score-grid span { min-height: 46px; font-size: 1.15rem; }
+.edit-card select, .edit-card textarea { width: 100%; }
+.edit-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; gap: 10px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--bg-2, #0c2a1b); border-top: 2px solid var(--gold, #e8b84a); max-width: 560px; margin: 0 auto; }
+.edit-bar .grow { flex: 1; }
+.edit-bar .btn.ghost { color: #fff; border-color: var(--gold, #e8b84a); background: transparent; }
+.edit-section legend { float: left; width: 100%; margin-bottom: 2px; }
+.edit-section legend + * { clear: both; }

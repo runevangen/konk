@@ -1081,6 +1081,62 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     }
   }
 
+  {
+    // --- Mine svar: rediger-modus (alle kort på en gang, bare endringer lagres) ---
+    const state = freshState({ status: 'open', entries: {
+      i1: { id: 'e1', user_id: UID, item_id: 'i1', score: 7, guess_option_id: 'o2', comment: 'Frisk og fin' },
+      i3: { id: 'e3', user_id: UID, item_id: 'i3', score: 9, guess_option_id: null, comment: null },
+    } })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/k/julebrustest/mine')
+    await page.getByText('2 av 6 glass besvart').waitFor()
+    await page.getByTestId('rediger-alle').click()
+    const kort = page.getByTestId('rediger-kort')
+    await kort.nth(5).waitFor()
+    assert.strictEqual(await kort.count(), 6)
+    assert.strictEqual(await page.getByTestId('lagre-alle').innerText(), 'Ingen endringer')
+    assert.strictEqual(await page.getByTestId('lagre-alle').isDisabled(), true)
+    assert.strictEqual(await kort.nth(0).locator('.score-grid input[value="7"]').isChecked(), true, 'lagret score er valgt')
+    await shot(page, '41-mine-rediger')
+    // Avbryt uten endringer: rett tilbake, ingen spørsmål
+    await page.getByRole('button', { name: 'Avbryt' }).click()
+    await page.getByTestId('rediger-alle').waitFor()
+    // endre glass 1 (score + kommentar), og fyll bare gjetning på glass 2 (mangler score)
+    await page.getByTestId('rediger-alle').click()
+    await kort.nth(0).locator('.score-grid label:has(input[value="4"])').click()
+    await kort.nth(0).getByLabel(/Kommentar/).fill('Litt for søt')
+    await kort.nth(1).getByLabel('Gjetter på').selectOption('o1')
+    assert.ok(/2 endringer/.test(await page.getByTestId('lagre-alle').innerText()))
+    await page.getByTestId('lagre-alle').click()
+    await page.getByText('Velg score for glass 2 før du lagrer.').waitFor()
+    assert.strictEqual(state.saves.length, 0, 'ingenting lagres før alle har gyldig score')
+    await kort.nth(1).locator('.score-grid label:has(input[value="8"])').click()
+    await page.getByTestId('lagre-alle').click()
+    await page.getByText('Lagret 2 svar ✓').waitFor()
+    assert.strictEqual(state.saves.length, 2, 'bare de to endrede glassene sendes')
+    assert.deepStrictEqual(state.saves.map((x) => [x.item_id, x.score, x.comment]).sort(), [['i1', 4, 'Litt for søt'], ['i2', 8, null]])
+    assert.strictEqual(await page.getByTestId('score-1').innerText(), '4')
+    assert.strictEqual(await page.getByTestId('score-2').innerText(), '8')
+    assert.strictEqual(await page.getByTestId('rediger-kort').count(), 0, 'modusen er avsluttet')
+    // Avbryt med endringer spør først, og forkaster
+    await page.getByTestId('rediger-alle').click()
+    await kort.nth(2).locator('.score-grid label:has(input[value="1"])').click()
+    page.once('dialog', (dlg) => dlg.accept())
+    await page.getByRole('button', { name: 'Avbryt' }).click()
+    await page.getByTestId('rediger-alle').waitFor()
+    assert.strictEqual(await page.getByTestId('score-3').innerText(), '9', 'forkastet endring lagres ikke')
+    assert.strictEqual(state.saves.length, 2)
+    for (const w of [390, 320]) {
+      await page.setViewportSize({ width: w, height: 800 }); await page.getByTestId('rediger-alle').click()
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, `horisontal scroll i rediger-modus ved ${w}px`)
+      await page.getByRole('button', { name: 'Avbryt' }).click()
+    }
+    ok('mine svar: rediger-modus med alle kort, bare endringer lagres, mangler-score-vakt og avbryt')
+    await ctx.close()
+  }
+
   // --- Reduced motion ---
   {
     const state = freshState()
