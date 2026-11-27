@@ -99,10 +99,12 @@ export default function Home() {
                 <Progress value={done} max={total} label={`Fremdrift ${c.title}`} />
               </div>
             )}
-            <p className="small" style={{ margin: '10px 0 0', color: 'var(--red)', fontWeight: 700 }}>
-              {c.status === 'closed' ? 'Se resultatene →' : done > 0 ? 'Se og endre svarene dine →' : 'Begynn å smake →'}
-            </p>
           </Link>
+          <p style={{ margin: '14px 0 0' }}>
+            <Link className="btn gold block" to={c.status === 'closed' ? `/k/${c.slug}/resultat` : done > 0 ? `/k/${c.slug}/mine` : `/k/${c.slug}`} data-testid="hovedhandling">
+              {c.status === 'closed' ? '🏆 Se resultatene' : done > 0 ? '✏️ Se og endre svarene dine' : '🥂 Begynn å smake'}
+            </Link>
+          </p>
           {c.live_board && c.status !== 'draft' && (
             <p style={{ margin: '14px 0 0' }}>
               <Link className="btn gold block" to={`/k/${c.slug}/tavle`}>📊 Se live tavle</Link>
