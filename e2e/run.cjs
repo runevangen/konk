@@ -72,9 +72,10 @@ function makeBackend(state) {
       if (state.profileList && !q.get('id')) return json(state.profileList)
       return single([{ id: UID, display_name: 'Kari Nordmann', office_id: 'of1', anonymous: false, is_admin: !!state.admin }])
     }
-    if (p.endsWith('/rpc/konk_competition_by_code')) {
+    if (p.endsWith('/rpc/konk_join_by_code')) {
       const b = req.postDataJSON(); const list = state.comps || [{ ...COMP, status: state.status }]
-      const c = list.find((x) => x.code === String(b.p_code).toUpperCase() && (state.admin || (x.visible && x.status !== 'draft')))
+      const c = list.find((x) => x.code === String(b.p_code).toUpperCase() && (state.admin || x.status !== 'draft'))
+      if (c) { state.joined = state.joined || new Set(); state.joined.add(c.id); state.joinCalls = (state.joinCalls || 0) + 1 }
       return json(c ? { slug: c.slug, title: c.title, status: c.status } : null)
     }
     if (p.endsWith('/rpc/konk_regen_comp_code')) { const b = req.postDataJSON(); const c = (state.comps || []).find((x) => x.id === b.p_id); c.code = 'NYTT'; return json('NYTT') }
@@ -83,7 +84,7 @@ function makeBackend(state) {
       state.compCalls = state.compCalls || []
       if (m === 'PATCH') { const c = state.comps.find((x) => x.id === eq('id')); const b = req.postDataJSON(); Object.assign(c, b); state.compCalls.push(['PATCH', c.id, b]); return json([]) }
       if (m === 'DELETE') { state.compCalls.push(['DELETE', eq('id')]); state.comps = state.comps.filter((x) => x.id !== eq('id')); return json([]) }
-      const rows = state.comps.filter((x) => state.admin || (x.visible && x.status !== 'draft')).sort((a, b) => a.sort_order - b.sort_order)
+      const rows = state.comps.filter((x) => state.admin || ((x.visible || (state.joined && state.joined.has(x.id))) && x.status !== 'draft')).sort((a, b) => a.sort_order - b.sort_order)
       if (q.get('slug')) return single(rows.filter((x) => x.slug === eq('slug')))
       return json(rows)
     }
@@ -1211,10 +1212,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await shot(page, '42-forside-administrer')
     // gjør C synlig og A usynlig
     const grp = (t) => page.getByRole('group', { name: `Administrer ${t}` })
-    await grp('Konkurranse C').getByRole('button', { name: /Usynlig/ }).click()
+    await grp('Konkurranse C').getByRole('button', { name: /Bare med kode/ }).click()
     await page.getByText('Konkurransen er synlig for alle.').waitFor()
     await grp('Konkurranse A').getByRole('button', { name: /Synlig/ }).click()
-    await page.getByText('Konkurransen er skjult for alle andre enn deg.').waitFor()
+    await page.getByText('Konkurransen er nå skjult fra forsiden. Den er bare tilgjengelig med kode.').waitFor()
     assert.deepStrictEqual(state.comps.map((x) => [x.id, x.visible]), [['c1', false], ['c2', true], ['c3', true]])
     // slett: krever SLETT, og avbryt gjør ingenting
     await grp('Konkurranse B').getByRole('button', { name: /Slett/ }).click()
@@ -1242,6 +1243,13 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await u.page.getByText('Konkurranse C').waitFor()
     assert.deepStrictEqual(await titles(u.page), ['Konkurranse C'])
     assert.strictEqual(await u.page.getByTestId('administrer').count(), 0)
+    // A er skjult fra forsiden, men koden gir tilgang, og kontoen husker det: A står på forsiden etterpå
+    await u.page.goto(BASE + '/kode/AAAA')
+    await u.page.waitForURL('**/k/a')
+    await u.page.goto(BASE + '/')
+    await u.page.getByText('Konkurranse A').waitFor()
+    assert.deepStrictEqual(await titles(u.page), ['Konkurranse A', 'Konkurranse C'], 'koden huskes: skjult konkurranse står nå i listen til den som brukte koden')
+    assert.strictEqual(s2.joinCalls, 1)
     ok('forsiden: admin skjuler/viser, flytter opp og ned og sletter (med SLETT-bekreftelse); andre ser bare synlige')
     await u.ctx.close()
   }
@@ -1303,6 +1311,68 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.ok(/NYTT/.test(await a.page.getByTestId('romkode').innerText()))
     ok('romkode: admin ser koden og kan lage en ny')
     await a.ctx.close()
+  }
+
+  {
+    // --- Storskjerm for konkurranse: live mens den er åpen, avsløring fra bunnen når den er avsluttet (bare admin) ---
+    const fit = async (page, hva) => assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, `storskjermen passer på 1280x720 uten rulling: ${hva}`)
+    const vp = { viewport: { width: 1280, height: 720 }, isMobile: false, hasTouch: false }
+    const login = async (page) => { await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click(); await page.getByRole('heading', { name: /God jul/ }).waitFor() }
+    {
+      const state = freshState({ admin: true, status: 'open' })
+      const { ctx, page } = await newPage(browser, state, vp)
+      await login(page)
+      await page.goto(BASE + '/k/julebrustest/skjerm')
+      await page.getByTestId('skjerm-glass').first().waitFor()
+      assert.strictEqual(await page.getByTestId('skjerm-glass').count(), 2)   // live-mocken har to glass
+      assert.strictEqual(await page.getByTestId('skjerm-kode').innerText(), 'PMEC')
+      await page.locator('[data-testid="skjerm-qr"] svg').waitFor()
+      assert.ok(/3 deltakere/.test(await page.getByTestId('skjerm-deltakere').innerText()))
+      assert.strictEqual(await page.getByText('Ringnes').count(), 0, 'navn på enhet vises ikke når admin har det av')
+      await fit(page, 'live'); await shot(page, '43-konk-skjerm-live')
+      await ctx.close()
+    }
+    {
+      const state = freshState({ admin: true, status: 'closed' })
+      const { ctx, page } = await newPage(browser, state, vp)
+      await login(page)
+      await page.goto(BASE + '/k/julebrustest/skjerm')
+      await page.getByText('Nå avslører vi resultatet').waitFor()
+      assert.strictEqual(await page.getByTestId('skjerm-sitat').count(), 0, 'ingenting er avslørt før admin trykker Neste')
+      await fit(page, 'start')
+      await page.getByTestId('skjerm-neste').click()
+      await page.getByTestId('skjerm-avslort').waitFor()
+      assert.ok(/Mineralvann/.test(await page.getByTestId('skjerm-avslort').innerText()) && /Plass 6/.test(await page.getByTestId('skjerm-avslort').innerText()), 'siste plass avsløres først')
+      await fit(page, 'første avsløring')
+      for (let k = 0; k < 4; k++) await page.keyboard.press('ArrowRight')            // piltast fungerer også
+      await page.getByText('Plass 2').first().waitFor()
+      await page.keyboard.press('ArrowRight')
+      await page.getByText('🏆 Vinneren').waitFor()
+      const vinner = await page.getByTestId('skjerm-avslort').innerText()
+      assert.ok(/Pepsi Jul/.test(vinner) && /8,40|8\.40/.test(vinner), 'vinneren er glass 3')
+      assert.ok(/Dagens sitat/.test(await page.getByTestId('skjerm-sitat').innerText()) && /Myk, krydret/.test(await page.getByTestId('skjerm-sitat').innerText()))
+      assert.ok(/Krydret/.test(await page.getByTestId('skjerm-smak').innerText()))
+      await fit(page, 'vinner'); await page.waitForTimeout(800); await shot(page, '44-konk-skjerm-vinner')
+      await page.getByTestId('skjerm-neste').click()
+      await page.getByTestId('skjerm-oppsummering').waitFor()
+      assert.strictEqual(await page.getByTestId('skjerm-topp').count(), 6)
+      assert.ok(await page.getByTestId('skjerm-kommentar').innerText().then((t) => /Dagens sitat/.test(t)), 'sitatet står først i kommentarrekken')
+      await page.getByTestId('skjerm-gjettere').waitFor()
+      await fit(page, 'oppsummering'); await shot(page, '45-konk-skjerm-oppsummering')
+      await page.getByRole('button', { name: 'Forrige' }).click()
+      await page.getByText('🏆 Vinneren').waitFor()
+      await ctx.close()
+    }
+    {
+      const state = freshState({ admin: false, status: 'closed' })
+      const { ctx, page } = await newPage(browser, state)
+      await login(page)
+      await page.goto(BASE + '/k/julebrustest/skjerm')
+      await page.getByRole('heading', { name: /God jul/ }).waitFor()
+      assert.strictEqual(new URL(page.url()).pathname, '/')
+      await ctx.close()
+    }
+    ok('storskjerm for konkurranse: live med kode og QR, avsløring fra bunnen med Neste og piltaster, oppsummering med topp 10 og sitat, bare admin')
   }
 
   // --- Reduced motion ---

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { competitionByCode } from '../api/data'
+import { joinCompetitionByCode } from '../api/data'
 import { errorMessage } from '../api/functions'
 import { quizJoin } from '../api/quiz'
 import { Loading } from '../components/ui'
@@ -20,7 +20,7 @@ export default function KodeVei() {
     if (!isCode(code)) { setMsg('Koden er fire bokstaver.'); return }
     void (async () => {
       try {
-        const comp = await competitionByCode(code)
+        const comp = await joinCompetitionByCode(code)
         if (comp) { nav(comp.status === 'closed' ? `/k/${comp.slug}/resultat` : `/k/${comp.slug}`, { replace: true }); return }
         const r = await quizJoin(code)
         if ('ok' in r) { nav(`/quiz/${r.code}`, { replace: true }); return }

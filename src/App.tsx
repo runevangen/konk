@@ -17,6 +17,7 @@ import QuizNew from './pages/quiz/QuizNew'
 import QuizRoom from './pages/quiz/QuizRoom'
 import QuizSkjerm from './pages/quiz/QuizSkjerm'
 import KodeVei from './pages/KodeVei'
+import KonkSkjerm from './pages/KonkSkjerm'
 
 function RequireAuth({ children, admin = false }: { children: React.ReactElement; admin?: boolean }) {
   const { loading, session, profile } = useAuth()
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/registrer" element={<Register />} />
         <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
         <Route path="/k/:slug" element={<RequireAuth><Competition /></RequireAuth>} />
+        <Route path="/k/:slug/skjerm" element={<RequireAuth admin><KonkSkjerm /></RequireAuth>} />
         <Route path="/k/:slug/mine" element={<RequireAuth><Mine /></RequireAuth>} />
         <Route path="/k/:slug/tavle" element={<RequireAuth><Tavle /></RequireAuth>} />
         <Route path="/k/:slug/resultat" element={<RequireAuth><Results /></RequireAuth>} />
