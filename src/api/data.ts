@@ -100,6 +100,10 @@ export async function saveCompetition(c: { id?: Id; slug: string; title: string;
 export async function joinCompetitionByCode(code: string) {
   return check(await supabase.rpc('konk_join_by_code', { p_code: code })) as { slug: string; title: string; status: CompetitionStatus } | null
 }
+/** Admin: velg koden selv (fire bokstaver). Gir {ok,code} eller {error: 'invalid' | 'in_use' | 'not_found'}. */
+export async function setCompetitionCode(id: Id, code: string) {
+  return check(await supabase.rpc('konk_set_comp_code', { p_id: id, p_code: code })) as { ok: true; code: string } | { error: 'invalid' | 'in_use' | 'not_found' }
+}
 /** Admin: gi konkurransen en ny kode. */
 export async function regenCompetitionCode(id: Id) {
   return check(await supabase.rpc('konk_regen_comp_code', { p_id: id })) as string

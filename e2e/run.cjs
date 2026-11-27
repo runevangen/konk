@@ -78,6 +78,12 @@ function makeBackend(state) {
       if (c) { state.joined = state.joined || new Set(); state.joined.add(c.id); state.joinCalls = (state.joinCalls || 0) + 1 }
       return json(c ? { slug: c.slug, title: c.title, status: c.status } : null)
     }
+    if (p.endsWith('/rpc/konk_set_comp_code')) {
+      const b = req.postDataJSON(); const c = (state.comps || []).find((x) => x.id === b.p_id); const code = String(b.p_code).toUpperCase()
+      if (!/^[A-Z]{4}$/.test(code)) return json({ error: 'invalid' })
+      if ((state.comps || []).some((x) => x.code === code && x.id !== b.p_id)) return json({ error: 'in_use' })
+      c.code = code; return json({ ok: true, code })
+    }
     if (p.endsWith('/rpc/konk_regen_comp_code')) { const b = req.postDataJSON(); const c = (state.comps || []).find((x) => x.id === b.p_id); c.code = 'NYTT'; return json('NYTT') }
     if (state.comps && p.endsWith('/rest/v1/konk_competitions')) {
       const m = req.method()
@@ -1299,17 +1305,33 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByText('Fant ingen konkurranse eller quiz med den koden.').waitFor({ timeout: 8000 })
     ok('romkode: QR-lenke og skrevet kode fører rett til konkurransen, ugyldig kode gir beskjed')
     await ctx.close()
-    const st2 = freshState({ admin: true }); st2.comps = [{ ...COMP, id: 'c1', slug: 'a', title: 'Konkurranse A', visible: true, sort_order: 10, code: 'AAAA' }]
+    const st2 = freshState({ admin: true }); st2.comps = [{ ...COMP, id: 'c1', slug: 'a', title: 'Konkurranse A', visible: true, sort_order: 10, code: 'AAAA' }, { ...COMP, id: 'c9', slug: 'z', title: 'Konkurranse Z', visible: true, sort_order: 20, code: 'ZZZA' }]
     const a = await newPage(browser, st2)
     await a.page.goto(BASE + '/login'); await a.page.locator('#name').fill('Kari'); await a.page.locator('#pin').fill('123456'); await a.page.getByRole('button', { name: 'Logg inn' }).click()
     await a.page.getByRole('heading', { name: /God jul/ }).waitFor()
-    await a.page.getByTestId('administrer').click()
-    assert.ok(/AAAA/.test(await a.page.getByTestId('romkode').innerText()))
-    a.page.once('dialog', (d) => d.accept())
-    await a.page.getByRole('button', { name: 'Ny kode' }).click()
-    await a.page.getByText('Ny kode er laget.').waitFor()
-    assert.ok(/NYTT/.test(await a.page.getByTestId('romkode').innerText()))
-    ok('romkode: admin ser koden og kan lage en ny')
+    // kode og storskjerm ligger rett på kortet, uten å trykke Administrer først
+    assert.ok(/AAAA/.test(await a.page.getByTestId('romkode').first().innerText()))
+    assert.strictEqual(await a.page.getByTestId('storskjerm-lenke').first().getAttribute('href'), '/k/a/skjerm')
+    assert.strictEqual(await a.page.getByTestId('storskjerm-lenke').first().getAttribute('target'), '_blank')
+    await a.page.getByRole('button', { name: '✏️ Endre kode' }).first().click()
+    await a.page.getByLabel(/Romkode \(fire/).fill(''); await a.page.getByLabel(/Romkode \(fire/).pressSequentially('jul1e')   // tall og småbokstaver renses mens du skriver: JULE
+    assert.strictEqual(await a.page.getByLabel(/Romkode \(fire/).inputValue(), 'JULE')
+    await a.page.getByRole('button', { name: 'Lagre', exact: true }).click()
+    await a.page.getByText('Koden er nå JULE.').waitFor()
+    assert.ok(/JULE/.test(await a.page.getByTestId('romkode').first().innerText()))
+    assert.strictEqual(st2.comps[0].code, 'JULE')
+    // koden til en annen konkurranse er opptatt
+    await a.page.getByRole('button', { name: '✏️ Endre kode' }).first().click()
+    await a.page.getByLabel(/Romkode \(fire/).fill('ZZZA')
+    await a.page.getByRole('button', { name: 'Lagre', exact: true }).click()
+    await a.page.getByText('Den koden er i bruk. Velg en annen.').waitFor()
+    await a.page.getByRole('button', { name: 'Avbryt' }).click()
+    // tilfeldig
+    await a.page.getByRole('button', { name: '✏️ Endre kode' }).first().click()
+    await a.page.getByRole('button', { name: '🎲 Tilfeldig' }).click()
+    await a.page.getByText('Ny kode: NYTT.').waitFor()
+    assert.ok(/NYTT/.test(await a.page.getByTestId('romkode').first().innerText()))
+    ok('romkode: admin ser koden og Storskjerm på kortet, velger egen kode eller tilfeldig')
     await a.ctx.close()
   }
 

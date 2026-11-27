@@ -364,3 +364,5 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 @keyframes skjerm-inn { from { transform: translateY(24px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .skjerm-reveal { animation: none; } .skjerm-bar-track i { transition: none; } }
 @media (max-width: 800px) { .skjerm-live { grid-template-columns: 1fr; } }
+.admin-rad { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-strong); }
+.kode-editor { width: 100%; }
