@@ -6,6 +6,7 @@ import { useAuth } from '../auth'
 import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
 import { CommentField, TagPicker } from '../components/Taste'
+import { glassList, usedGuesses } from '../lib/guesses'
 import { cleanComment, cleanTags, COMMENT_MAX, isValidScore, SCORE_MAX, SCORE_MIN } from '../lib/validation'
 
 interface Draft { score: number | null; guess: string | null; comment: string; tags: string[] }
@@ -92,6 +93,7 @@ export default function Mine() {
   if (!data) return <div className="card"><h1>Fant ikke konkurransen</h1><Link to="/">Til forsiden</Link></div>
   const { comp, items, options } = data
   const open = comp.status === 'open'
+  const itemIds = items.map((i) => i.id)
   const answered = items.filter((i) => savedIds.has(i.id)).length
   const guessLabel = (id: string | null) => (id ? options.find((o) => o.id === id)?.label ?? '?' : 'Vet ikke')
 
@@ -147,7 +149,7 @@ export default function Mine() {
                 <label className="field" htmlFor={`mine-gjett-${it.id}`}>Gjetter på</label>
                 <select id={`mine-gjett-${it.id}`} value={d.guess ?? ''} onChange={(ev) => update(it.id, { guess: ev.target.value || null }, true)}>
                   <option value="">Vet ikke</option>
-                  {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                  {options.map((o) => { const u = usedGuesses(itemIds, (id) => drafts[id]?.guess, it.id).get(o.id); return <option key={o.id} value={o.id}>{o.label}{u ? `  ✓ ${glassList(u)}` : ''}</option> })}
                 </select>
               </div>
             )}
