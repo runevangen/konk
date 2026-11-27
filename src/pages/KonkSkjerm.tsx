@@ -98,8 +98,10 @@ export default function KonkSkjerm() {
             {board && (
               <>
                 <p className="skjerm-label" data-testid="skjerm-deltakere">{pluralize(board.overall.participants, 'deltaker', 'deltakere')} · {pluralize(board.overall.n_entries, 'svar', 'svar')}</p>
-                {board.offices.filter((o) => o.participants > 0).map((o) => (
-                  <p key={o.office_id} className="skjerm-label" style={{ margin: 0 }}><strong>{o.name}</strong> snitt {formatScore(o.avg_score, 2)} · {pluralize(o.participants, 'deltaker', 'deltakere')}</p>
+                {board.offices.map((o) => (
+                  <p key={o.office_id} className="skjerm-label" style={{ margin: 0 }} data-testid="skjerm-kontor">
+                    <strong>{o.name}</strong>{' '}{o.participants > 0 && o.avg_score != null ? `snitt ${formatScore(o.avg_score, 2)} · ${pluralize(o.participants, 'deltaker', 'deltakere')}` : o.participants > 0 ? `${pluralize(o.participants, 'deltaker', 'deltakere')} · venter på svar` : 'ingen svar ennå'}
+                  </p>
                 ))}
               </>
             )}
@@ -173,7 +175,7 @@ function RevealGlass({ rank, row, comments, isWinner }: { rank: number; row: Res
 
 function Summary({ results, ranked, board }: { results: Results; ranked: { rank: number; row: ResultsItem }[]; board: LiveBoard | null }) {
   const people = board ? rankBy(board.people.filter((p) => p.guesses > 0), (p) => p.hits).slice(0, 10) : []
-  const offices = results.offices.filter((o) => o.participants > 0)
+  const offices = results.offices
   const quotes = useMemo(() => {
     const byPos = new Map(results.items.map((i) => [i.item_id, i.position]))
     return [...results.comments].sort((a, b) => Number(b.featured) - Number(a.featured) || (byPos.get(a.item_id) ?? 0) - (byPos.get(b.item_id) ?? 0))
@@ -202,7 +204,7 @@ function Summary({ results, ranked, board }: { results: Results; ranked: { rank:
           </ol>
         </div>
         <div>
-          {offices.length > 0 && (<><h2>Kontorene</h2>{offices.map((o) => <p key={o.office_id} className="skjerm-label" style={{ margin: '2px 0' }}><strong>{o.name}</strong> snitt {formatScore(o.avg_score, 2)} · {formatPercent(o.hit_rate)} riktige</p>)}</>)}
+          {offices.length > 0 && (<><h2>Kontorene</h2>{offices.map((o) => <p key={o.office_id} className="skjerm-label" style={{ margin: '2px 0' }} data-testid="skjerm-kontor"><strong>{o.name}</strong>{' '}{o.participants > 0 ? `snitt ${formatScore(o.avg_score, 2)} · ${formatPercent(o.hit_rate)} riktige` : 'ingen svar'}</p>)}</>)}
           {people.length > 0 && (
             <>
               <h2>Beste gjettere</h2>
