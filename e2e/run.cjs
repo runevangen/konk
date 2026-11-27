@@ -310,24 +310,24 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByText('Se og endre svarene dine').click()
     await page.getByRole('heading', { name: 'Mine svar' }).waitFor()
     await page.getByText('2 av 6 glass besvart').waitFor()
-    assert.strictEqual(await page.getByTestId('score-1').innerText(), '7')
-    assert.strictEqual(await page.getByTestId('score-3').innerText(), '9')
-    await page.getByText('Julebrus A').waitFor()
-    await page.getByText('Frisk og fin').waitFor()
-    await page.getByText('Vet ikke').waitFor()
-    assert.strictEqual(await page.getByText('Ikke besvart ennå.').count(), 4)
+    const kort = page.getByTestId('rediger-kort')
+    await kort.nth(5).waitFor()
+    assert.strictEqual(await kort.nth(0).locator('.score-grid input[value="7"]').isChecked(), true)
+    assert.strictEqual(await kort.nth(2).locator('.score-grid input[value="9"]').isChecked(), true)
+    assert.strictEqual(await kort.nth(0).getByLabel('Gjetter på').inputValue(), 'o2')
+    assert.strictEqual(await kort.nth(0).getByLabel(/Kommentar/).inputValue(), 'Frisk og fin')
+    assert.strictEqual(await kort.nth(2).getByLabel('Gjetter på').inputValue(), '')
+    assert.strictEqual(await page.getByText('ikke besvart', { exact: true }).count(), 4)
     await shot(page, '14-mine-svar')
-    // Endre -> riktig glass, med lagrede svar
-    await page.getByRole('link', { name: 'Endre' }).first().click()
+    // ett trykk på et tall lagrer med en gang, uten «Endre» og uten mellomskjerm
+    await kort.nth(0).locator('.score-grid label:has(input[value="4"])').click()
+    await page.getByTestId('status-1').getByText('Lagret ✓').waitFor()
+    assert.strictEqual(state.saves.at(-1).score, 4)
+    // den nye verdien er det glass-for-glass-siden også viser
+    await page.goto(BASE + '/k/julebrustest?glass=1')
     await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor()
-    assert.strictEqual(await page.locator('.score-grid input[value="7"]').isChecked(), true)
-    // endre score og gå til oversikten via knapp: ny verdi vises (lagring ventes ferdig)
-    await page.locator('.score-grid label:has(input[value="4"])').click()
-    await page.getByRole('button', { name: /Mine svar/ }).click()
-    await page.getByRole('heading', { name: 'Mine svar' }).waitFor()
-    await page.getByText('4', { exact: true }).first().waitFor()
-    assert.strictEqual(await page.getByTestId('score-1').innerText(), '4')
-    ok('mine svar: oversikt over alle svar, endre-lenke og siste versjon vises')
+    assert.strictEqual(await page.locator('.score-grid input[value="4"]').isChecked(), true)
+    ok('mine svar: alle svar redigerbare i oversikten, ett trykk lagrer, og glass-for-glass-siden viser siste versjon')
     await ctx.close()
   }
 
@@ -1082,7 +1082,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
   }
 
   {
-    // --- Mine svar: rediger-modus (alle kort på en gang, bare endringer lagres) ---
+    // --- Mine svar: alltid redigerbar, hver endring lagres med en gang ---
     const state = freshState({ status: 'open', entries: {
       i1: { id: 'e1', user_id: UID, item_id: 'i1', score: 7, guess_option_id: 'o2', comment: 'Frisk og fin' },
       i3: { id: 'e3', user_id: UID, item_id: 'i3', score: 9, guess_option_id: null, comment: null },
@@ -1090,50 +1090,44 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     const { ctx, page } = await newPage(browser, state)
     await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
     await page.getByRole('heading', { name: /God jul/ }).waitFor()
-    await page.goto(BASE + '/k/julebrustest/mine')
-    await page.getByText('2 av 6 glass besvart').waitFor()
-    await page.getByTestId('rediger-alle').click()
+    // fra forsiden: ett trykk til oversikten, og der kan alt endres
+    await page.getByText('Se og endre svarene dine').click()
     const kort = page.getByTestId('rediger-kort')
     await kort.nth(5).waitFor()
-    assert.strictEqual(await kort.count(), 6)
-    assert.strictEqual(await page.getByTestId('lagre-alle').innerText(), 'Ingen endringer')
-    assert.strictEqual(await page.getByTestId('lagre-alle').isDisabled(), true)
-    assert.strictEqual(await kort.nth(0).locator('.score-grid input[value="7"]').isChecked(), true, 'lagret score er valgt')
+    assert.strictEqual(await page.getByRole('button', { name: /Rediger svar/ }).count(), 0, 'ingen Rediger-knapp å trykke først')
+    assert.strictEqual(await page.getByRole('link', { name: 'Endre' }).count(), 0, 'ingen Endre-skjerm')
     await shot(page, '41-mine-rediger')
-    // Avbryt uten endringer: rett tilbake, ingen spørsmål
-    await page.getByRole('button', { name: 'Avbryt' }).click()
-    await page.getByTestId('rediger-alle').waitFor()
-    // endre glass 1 (score + kommentar), og fyll bare gjetning på glass 2 (mangler score)
-    await page.getByTestId('rediger-alle').click()
-    await kort.nth(0).locator('.score-grid label:has(input[value="4"])').click()
+    // gjetning og kommentar lagres også
+    await kort.nth(0).getByLabel('Gjetter på').selectOption('o3')
+    await page.getByTestId('status-1').getByText('Lagret ✓').waitFor()
+    assert.strictEqual(state.saves.at(-1).guess_option_id, 'o3')
     await kort.nth(0).getByLabel(/Kommentar/).fill('Litt for søt')
+    for (let k = 0; k < 50 && state.saves.at(-1).comment !== 'Litt for søt'; k++) await page.waitForTimeout(100)   // «Lagret ✓» står fra forrige lagring til ny starter
+    assert.strictEqual(state.saves.at(-1).comment, 'Litt for søt')
+    await page.getByTestId('status-1').getByText('Lagret ✓').waitFor()
+    assert.strictEqual(state.saves.at(-1).score, 7, 'scoren ligger fast når bare kommentaren endres')
+    // nytt glass: gjetning uten score lagres ikke, score gjør det
+    const before = state.saves.length
     await kort.nth(1).getByLabel('Gjetter på').selectOption('o1')
-    assert.ok(/2 endringer/.test(await page.getByTestId('lagre-alle').innerText()))
-    await page.getByTestId('lagre-alle').click()
-    await page.getByText('Velg score for glass 2 før du lagrer.').waitFor()
-    assert.strictEqual(state.saves.length, 0, 'ingenting lagres før alle har gyldig score')
+    await page.getByTestId('status-2').getByText('Velg en score for å lagre.').waitFor()
+    assert.strictEqual(state.saves.length, before, 'ingenting lagres uten score')
     await kort.nth(1).locator('.score-grid label:has(input[value="8"])').click()
-    await page.getByTestId('lagre-alle').click()
-    await page.getByText('Lagret 2 svar ✓').waitFor()
-    assert.strictEqual(state.saves.length, 2, 'bare de to endrede glassene sendes')
-    assert.deepStrictEqual(state.saves.map((x) => [x.item_id, x.score, x.comment]).sort(), [['i1', 4, 'Litt for søt'], ['i2', 8, null]])
-    assert.strictEqual(await page.getByTestId('score-1').innerText(), '4')
-    assert.strictEqual(await page.getByTestId('score-2').innerText(), '8')
-    assert.strictEqual(await page.getByTestId('rediger-kort').count(), 0, 'modusen er avsluttet')
-    // Avbryt med endringer spør først, og forkaster
-    await page.getByTestId('rediger-alle').click()
+    await page.getByTestId('status-2').getByText('Lagret ✓').waitFor()
+    assert.deepStrictEqual([state.saves.at(-1).item_id, state.saves.at(-1).score, state.saves.at(-1).guess_option_id], ['i2', 8, 'o1'])
+    await page.getByText('3 av 6 glass besvart').waitFor()
+    // raske trykk: bare siste gjelder, og kortet har aldri to markerte tall
     await kort.nth(2).locator('.score-grid label:has(input[value="1"])').click()
-    page.once('dialog', (dlg) => dlg.accept())
-    await page.getByRole('button', { name: 'Avbryt' }).click()
-    await page.getByTestId('rediger-alle').waitFor()
-    assert.strictEqual(await page.getByTestId('score-3').innerText(), '9', 'forkastet endring lagres ikke')
-    assert.strictEqual(state.saves.length, 2)
+    await kort.nth(2).locator('.score-grid label:has(input[value="2"])').click()
+    await kort.nth(2).locator('.score-grid label:has(input[value="3"])').click()
+    await page.getByTestId('status-3').getByText('Lagret ✓').waitFor()
+    assert.deepStrictEqual(await kort.nth(2).locator('.score-grid span.on').allInnerTexts(), ['3'])
+    await page.waitForTimeout(300)
+    assert.strictEqual(state.entries.i3.score, 3, 'siste trykk er det som ligger lagret')
     for (const w of [390, 320]) {
-      await page.setViewportSize({ width: w, height: 800 }); await page.getByTestId('rediger-alle').click()
-      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, `horisontal scroll i rediger-modus ved ${w}px`)
-      await page.getByRole('button', { name: 'Avbryt' }).click()
+      await page.setViewportSize({ width: w, height: 800 })
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, `horisontal scroll i Mine svar ved ${w}px`)
     }
-    ok('mine svar: rediger-modus med alle kort, bare endringer lagres, mangler-score-vakt og avbryt')
+    ok('mine svar: alltid redigerbar med autolagring (score, gjetning, kommentar), score-vakt og raske trykk')
     await ctx.close()
   }
 
