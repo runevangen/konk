@@ -68,23 +68,10 @@ function CompetitionsTab({ comps, reload, onReset }: { comps: Competition[]; rel
       setEditing(null); await reload()
     })
   }
-  return (
-    <>
-      {comps.map((c) => (
-        <div className="card" key={c.id}>
-          <div className="row between"><strong>{c.title}</strong><StatusBadge status={c.status} /></div>
-          <p className="soft small">/{c.slug} · {c.kind}{c.live_board ? ' · live tavle på' : ''}</p>
-          {c.live_board && c.status !== 'draft' && <p className="small"><a href={`/k/${c.slug}/tavle`}>Åpne live tavle →</a></p>}
-          <KodeRad comp={c} onChanged={() => void reload()} />
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn ghost small" onClick={() => setEditing(c)}>Rediger</button>
-            <button className="btn ghost small" onClick={() => onReset(c.id)}>Nullstill svar …</button>
-          </div>
-        </div>
-      ))}
-      {!editing && <button className="btn gold" onClick={() => setEditing({ status: 'draft', kind: 'brus', live_board: false, live_board_names: false })}>+ Ny konkurranse</button>}
-      {editing && (
-        <form className="card" onSubmit={submit}>
+  const skjema = () => {
+    if (!editing) return null
+    return (
+    <form className="card" onSubmit={submit} data-testid="rediger-skjema" key={`ed-${editing?.id ?? 'ny'}`}>
           <h2>{editing.id ? 'Rediger konkurranse' : 'Ny konkurranse'}</h2>
           <label className="field">Tittel<input type="text" value={editing.title ?? ''} onChange={(e) => setEditing({ ...editing, title: e.target.value })} /></label>
           <label className="field">Slug (adresse)<input type="text" value={editing.slug ?? ''} onChange={(e) => setEditing({ ...editing, slug: e.target.value })} /></label>
@@ -107,7 +94,26 @@ function CompetitionsTab({ comps, reload, onReset }: { comps: Competition[]; rel
           {err && <p className="error" role="alert">{err}</p>}
           <div className="row"><button className="btn">Lagre</button><button type="button" className="btn ghost" onClick={() => setEditing(null)}>Avbryt</button></div>
         </form>
-      )}
+    )
+  }
+  return (
+    <>
+      {comps.map((c) => (
+        editing?.id === c.id ? <div key={c.id}>{skjema()}</div> : (
+        <div className="card" key={c.id}>
+          <div className="row between"><strong>{c.title}</strong><StatusBadge status={c.status} /></div>
+          <p className="soft small">/{c.slug} · {c.kind}{c.live_board ? ' · live tavle på' : ''}</p>
+          {c.live_board && c.status !== 'draft' && <p className="small"><a href={`/k/${c.slug}/tavle`}>Åpne live tavle →</a></p>}
+          <KodeRad comp={c} onChanged={() => void reload()} />
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn ghost small" onClick={() => setEditing(c)}>Rediger</button>
+            <button className="btn ghost small" onClick={() => onReset(c.id)}>Nullstill svar …</button>
+          </div>
+        </div>
+        )
+      ))}
+      {!editing && <button className="btn gold" onClick={() => setEditing({ status: 'draft', kind: 'brus', live_board: false, live_board_names: false })}>+ Ny konkurranse</button>}
+      {editing && !editing.id && skjema()}
       {!editing && err && <div className="on-bg-error" role="alert">{err}</div>}
     </>
   )
