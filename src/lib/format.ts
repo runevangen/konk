@@ -29,3 +29,8 @@ export function rankBy<T>(rows: T[], get: (r: T) => number | null): Ranked<T>[] 
 export function pluralize(n: number, one: string, many: string) {
   return `${n} ${n === 1 ? one : many}`
 }
+
+/** «Topp 10» bare når det er flere enn ti å velge blant; ellers er det hele lista, og da sier vi det. */
+export function toppTittel(n: number, limit = 10, hele = 'Rangering'): string {
+  return n > limit ? `Topp ${limit}` : hele
+}

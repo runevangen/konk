@@ -4,6 +4,7 @@ import { errorMessage } from '../../api/functions'
 import { Loading } from '../../components/ui'
 import { Qr } from '../../components/Qr'
 import { Countdown, GiftCountdown, LETTERS, OfficeBoard, RankList } from '../../components/quiz/parts'
+import { toppTittel } from '../../lib/format'
 import { isCode, isOfficeTie, normalizeCode, officeWinner, ranked } from '../../lib/quiz'
 import { useQuizRoom } from './useQuizRoom'
 
@@ -75,7 +76,7 @@ export default function QuizSkjerm() {
           </div>
           {answer && state.ranking && (
             <div>
-              <h2>Stillingen – topp 10</h2>
+              <h2>{state.ranking && state.ranking.length > 10 ? 'Stillingen – topp 10' : 'Stillingen'}</h2>
               <RankList rows={state.ranking} limit={10} big compact hideMe />
               {state.offices && <OfficeBoard offices={state.offices} big />}
             </div>
@@ -100,7 +101,7 @@ export default function QuizSkjerm() {
       </ol>
       {office && !isOfficeTie(state.offices ?? []) && <p className="skjerm-label" data-testid="skjerm-kontorvinner">Beste kontor: <strong>{office.office}</strong> (høyest snitt per spiller)</p>}
       <div className="skjerm-bunn">
-        <div><h2>Topp 10</h2><RankList rows={rows} limit={10} big compact hideMe /></div>
+        <div><h2>{toppTittel(rows.length, 10, 'Sluttresultat')}</h2><RankList rows={rows} limit={10} big compact hideMe /></div>
         {state.offices && <div><h2>Kontorene</h2><OfficeBoard offices={state.offices} big /></div>}
       </div>
     </>,

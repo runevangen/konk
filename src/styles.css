@@ -212,7 +212,7 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .players { list-style: none; margin: 0; padding: 0; }
 .players li { padding: 8px 0; border-bottom: 1px solid var(--border); }
 .rank-list { list-style: none; margin: 8px 0; padding: 0; }
-.rank-row { display: grid; grid-template-columns: 2.2rem 1fr auto; gap: 8px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+.rank-row { display: grid; grid-template-columns: 3.6rem 1fr auto; gap: 8px; align-items: center; padding: 8px 6px; border-bottom: 1px solid var(--border); }
 .rank-row.me { background: #fff4d2; border-radius: 8px; }
 .rank-row.big { font-size: 1.4rem; padding: 12px 8px; }
 .rank-n { text-align: center; font-weight: 700; }
@@ -396,3 +396,4 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .skjerm .glasspanel h3 { color: var(--red); }
 .skjerm .glasspanel .btn.ghost { color: var(--ink); border-color: var(--border-strong); background: transparent; }
 .skjerm .glasspanel .quote small { color: var(--soft); }
+.rank-row .rank-n { min-width: 3.4em; white-space: nowrap; }

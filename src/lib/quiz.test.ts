@@ -75,3 +75,11 @@ describe('feilmeldinger', () => {
     expect(joinErrorText('noe-annet')).toContain('Kunne ikke')
   })
 })
+
+import { placeLabel } from './quiz'
+describe('placeLabel', () => {
+  it('tall på alle plasser, medalje i tillegg for topp 3', () => {
+    expect(placeLabel(1)).toBe('1 🥇'); expect(placeLabel(2)).toBe('2 🥈'); expect(placeLabel(3)).toBe('3 🥉')
+    expect(placeLabel(4)).toBe('4'); expect(placeLabel(12)).toBe('12')
+  })
+})
