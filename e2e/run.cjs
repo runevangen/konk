@@ -313,6 +313,12 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('heading', { name: /Glass 2 av 6/ }).waitFor()
     await page.waitForTimeout(300)
     assert.strictEqual(state.saves.at(-1).comment, 'Endret rett før neste')
+    // gjetninger fra andre glass vises med hake, men kan fortsatt velges igjen
+    assert.strictEqual(await page.getByTestId('alt-gjettet').count(), 1)
+    assert.ok(/glass 1/.test(await page.getByTestId('alt-gjettet').innerText()))
+    assert.ok(await page.locator('.option-list label', { hasText: 'Julebrus A' }).getByTestId('alt-gjettet').isVisible(), 'haken står ved Julebrus A')
+    await page.getByLabel('Julebrus A').check()
+    assert.strictEqual(await page.getByLabel('Julebrus A').isChecked(), true, 'det er lov å gjette det samme igjen')
     ok('stepper: score/gjett/kommentar autosaves (upsert), flush ved Neste, gjetning uten score ber om score')
     // glass 3 for skjermbilde
     await page.getByRole('button', { name: 'Glass 3', exact: false }).first().click()
@@ -1162,6 +1168,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.strictEqual(state.saves.at(-1).comment, 'Litt for søt')
     await page.getByTestId('status-1').getByText('Lagret ✓').waitFor()
     assert.strictEqual(state.saves.at(-1).score, 7, 'scoren ligger fast når bare kommentaren endres')
+    // valgene viser hvilke glass du alt har gjettet dem på (hake i teksten)
+    assert.ok(/✓ glass 1/.test(await kort.nth(1).locator('option', { hasText: 'Julebrus B' }).innerText()), 'glass 1 er gjettet som Julebrus B, så glass 2 viser haken')
+    assert.ok(!/✓/.test(await kort.nth(0).locator('option', { hasText: 'Julebrus B' }).innerText()), 'ingen hake på glasset selv')
+    assert.ok(!/✓/.test(await kort.nth(1).locator('option', { hasText: 'Solo' }).innerText()), 'ubrukte valg har ingen hake')
     // smaksmerker lagres med en gang, og kommentarfeltet er lukket når det er tomt
     assert.strictEqual(await kort.nth(1).getByTestId('legg-til-kommentar').count(), 1)
     assert.strictEqual(await kort.nth(0).getByTestId('legg-til-kommentar').count(), 0, 'glass med kommentar viser feltet')

@@ -7,6 +7,7 @@ import { useAuth } from '../auth'
 import { ErrorBox, Loading, Progress, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
 import { CommentField, TagPicker } from '../components/Taste'
+import { glassList, usedGuesses } from '../lib/guesses'
 import { cleanComment, cleanTags, COMMENT_MAX, isValidScore, SCORE_MAX, SCORE_MIN } from '../lib/validation'
 
 interface Draft { score: number | null; guess: Id | null; comment: string; tags: string[] }
@@ -96,6 +97,7 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
 
   if (!item) return <div className="card"><h1>{comp.title}</h1><p>Ingen glass er lagt inn ennå.</p><Link to="/">Til forsiden</Link></div>
 
+  const used = usedGuesses(items.map((i) => i.id), (id) => drafts[id]?.guess, item.id)
   const d = drafts[item.id] ?? { score: null, guess: null, comment: '', tags: [] }
   const done = Object.values(drafts).filter((x) => isValidScore(x.score)).length
   const st = saveState[item.id] ?? 'idle'
@@ -154,7 +156,7 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
             <div className="option-list">
               <label key={`${item.id}-none`}><input type="radio" name={`guess-${item.id}`} checked={d.guess === null} onChange={() => update(item.id, { guess: null }, true)} /><span className={d.guess === null ? 'on' : ''}>Vet ikke</span></label>
               {options.map((o) => (
-                <label key={`${item.id}-${o.id}`}><input type="radio" name={`guess-${item.id}`} checked={d.guess === o.id} onChange={() => update(item.id, { guess: o.id }, true)} /><span className={d.guess === o.id ? 'on' : ''}>{o.label}</span></label>
+                <label key={`${item.id}-${o.id}`}><input type="radio" name={`guess-${item.id}`} checked={d.guess === o.id} onChange={() => update(item.id, { guess: o.id }, true)} /><span className={d.guess === o.id ? 'on' : ''}>{o.label}{used.get(o.id) && <small className="used" data-testid="alt-gjettet" aria-label={`Du har alt gjettet dette på ${glassList(used.get(o.id)!)}`}>✓ {glassList(used.get(o.id)!)}</small>}</span></label>
               ))}
             </div>
           </fieldset>

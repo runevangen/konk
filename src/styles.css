@@ -366,3 +366,6 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 @media (max-width: 800px) { .skjerm-live { grid-template-columns: 1fr; } }
 .admin-rad { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-strong); }
 .kode-editor { width: 100%; }
+.option-list span { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.option-list span .used { font: 600 .8rem system-ui, sans-serif; opacity: .85; white-space: nowrap; background: rgba(30,110,62,.14); border-radius: 999px; padding: 2px 10px; }
+.option-list span.on .used { background: rgba(255,255,255,.22); }
