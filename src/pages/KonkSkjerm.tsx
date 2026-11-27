@@ -6,7 +6,8 @@ import type { Competition, GuessOption, Item, LiveBoard, Profile, Results, Resul
 import { GlassPanel } from '../components/GlassPanel'
 import { Qr } from '../components/Qr'
 import { Loading } from '../components/ui'
-import { formatPercent, formatScore, pluralize, rankBy, scoreBarWidth } from '../lib/format'
+import { formatPercent, formatScore, pluralize, rankBy, scoreBarWidth, toppTittel } from '../lib/format'
+import { placeLabel } from '../lib/quiz'
 import { tasteProfile } from '../lib/validation'
 
 const POLL_MS = 4000
@@ -235,12 +236,12 @@ function Summary({ results, ranked, board, sel, onSel, panelFor }: { results: Re
       <h1 style={{ margin: '0 0 6px' }}>Resultat 🎉</h1>
       <div className="skjerm-bunn">
         <div>
-          <h2>Topp 10</h2>
+          <h2>{toppTittel(ranked.length)}</h2>
           <ol className="rank-list compact" aria-label="Glass etter snitt">
             {ranked.slice(0, 10).map(({ rank, row }) => (
               <li key={row.item_id} className={`rank-row big klikkbar-rad ${sel === row.item_id ? 'valgt' : ''}`} data-testid="skjerm-topp" role="button" tabIndex={0} aria-pressed={sel === row.item_id}
                 onClick={() => onSel(sel === row.item_id ? null : row.item_id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSel(sel === row.item_id ? null : row.item_id) } }}>
-                <span className="rank-n">{rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}</span>
+                <span className="rank-n">{placeLabel(rank)}</span>
                 <span className="rank-name"><strong>{row.correct_label ?? `Glass ${row.position}`}</strong> <span className="soft small">· glass {row.position}</span></span>
                 <span className="rank-pts"><strong>{formatScore(row.avg_score, 2)}</strong></span>
               </li>

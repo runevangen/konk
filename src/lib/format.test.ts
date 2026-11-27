@@ -24,3 +24,14 @@ describe('format', () => {
     expect(r[3].row.a).toBeNull()
   })
 })
+
+import { toppTittel } from './format'
+describe('toppTittel', () => {
+  it('sier «Topp 10» bare når det er mer enn ti', () => {
+    expect(toppTittel(11)).toBe('Topp 10')
+    expect(toppTittel(100)).toBe('Topp 10')
+    expect(toppTittel(10)).toBe('Rangering')
+    expect(toppTittel(6)).toBe('Rangering')
+    expect(toppTittel(2, 10, 'Sluttresultat')).toBe('Sluttresultat')
+  })
+})

@@ -55,3 +55,9 @@ const JOIN_ERRORS: Record<string, string> = {
   not_member: 'Du er ikke med i dette rommet.',
 }
 export const joinErrorText = (code: string) => JOIN_ERRORS[code] ?? 'Kunne ikke bli med i rommet.'
+
+/** Plassen med tall på alle, og medalje i tillegg for de tre beste: «1 🥇», «4». */
+export function placeLabel(rank: number): string {
+  const m = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''
+  return m ? `${rank} ${m}` : String(rank)
+}

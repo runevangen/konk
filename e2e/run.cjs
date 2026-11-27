@@ -1084,11 +1084,11 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     state.qz.state = { ...base, status: 'playing', players: pl, nr: 0, phase: 'answer', question: 'Hvem er størst?', options: ['A1', 'B1', 'C1', 'D1'], left_ms: 5000, correct_index: 2, explanation: 'Fordi.', ranking: rk, offices: of }
     await page.locator('[data-state="riktig"]').waitFor({ timeout: 5000 })
     assert.ok(/C1/.test(await page.locator('[data-state="riktig"]').textContent()))
-    await page.getByText('Stillingen – topp 10').waitFor()
+    await page.getByText('Stillingen', { exact: true }).waitFor()
     await shot(page, '37-skjerm-fasit'); assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, 'storskjermen må passe på 1280x720 uten rulling: 37-skjerm-fasit')
     state.qz.state = { ...base, status: 'finished', players: pl, ranking: rk, offices: of }
     await page.getByTestId('skjerm-pall').waitFor({ timeout: 5000 })
-    assert.ok(/Ola/.test(await page.getByTestId('skjerm-pall').locator('li').first().textContent())); await page.getByText('Topp 10', { exact: true }).waitFor()
+    assert.ok(/Ola/.test(await page.getByTestId('skjerm-pall').locator('li').first().textContent())); await page.getByText('Sluttresultat', { exact: true }).waitFor()
     await shot(page, '38-skjerm-pall'); assert.ok((await page.evaluate(() => document.documentElement.scrollHeight)) <= 722, 'storskjermen må passe på 1280x720 uten rulling: 38-skjerm-pall')
     state.qz.state = { ...base, is_host: false, status: 'lobby', players: pl }
     await page.getByText('Bare verten kan vise storskjerm').waitFor({ timeout: 5000 })
@@ -1401,6 +1401,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
       await page.getByTestId('skjerm-neste').click()
       await page.getByTestId('skjerm-oppsummering').waitFor()
       assert.strictEqual(await page.getByTestId('skjerm-topp').count(), 6)
+      assert.ok(await page.getByRole('heading', { name: 'Rangering', exact: true }).isVisible(), 'seks glass heter Rangering, ikke Topp 10')
+      assert.strictEqual(await page.getByText('Topp 10').count(), 0)
       assert.ok(await page.getByTestId('skjerm-kommentar').innerText().then((t) => /Dagens sitat/.test(t)), 'sitatet står først i kommentarrekken')
       await page.getByTestId('skjerm-gjettere').waitFor()
       await fit(page, 'oppsummering'); await shot(page, '45-konk-skjerm-oppsummering')

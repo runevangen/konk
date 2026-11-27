@@ -1,5 +1,5 @@
 import type { OfficeRow, QuizPlayer, RankRow } from '../../api/quiz'
-import { fractionLeft, isOfficeTie, medal, officeWinner, ranked, secondsLeft } from '../../lib/quiz'
+import { fractionLeft, isOfficeTie, officeWinner, placeLabel, ranked, secondsLeft } from '../../lib/quiz'
 
 export function Countdown({ remaining, totalSeconds, label }: { remaining: number; totalSeconds: number; label: string }) {
   const frac = fractionLeft(remaining, totalSeconds)
@@ -33,7 +33,7 @@ export function RankList({ rows, limit, big = false, compact = false, hideMe = f
   const meOut = limit && !hideMe ? all.find((r) => r.row.me && !shown.includes(r)) : undefined
   const line = ({ rank, row }: { rank: number; row: RankRow }, k: string) => (
     <li key={k} className={`rank-row ${row.me ? 'me' : ''} ${big ? 'big' : ''}`} data-testid="quiz-rang">
-      <span className="rank-n" aria-label={`Plass ${rank}`}>{medal(rank)}</span>
+      <span className="rank-n" aria-label={`Plass ${rank}`}>{placeLabel(rank)}</span>
       <span className="rank-name"><strong>{row.name}</strong>{row.me ? ' (deg)' : ''} <span className="soft small">· {row.office}</span></span>
       <span className="rank-pts"><strong>{row.points}</strong> <span className="soft small">p · {row.correct} riktig</span></span>
     </li>
