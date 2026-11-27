@@ -410,3 +410,18 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .sml-rad.du .sml-navn, .sml-rad.du .sml-tall { color: var(--green); }
 .sml-tall { text-align: right; }
 .tag.on .soft { color: inherit; opacity: .85; }
+
+/* Bruksanvisning for admin */
+.hjelp-del > summary { cursor: pointer; list-style: none; padding: 2px 0; font-size: 1.1rem; font-family: Georgia, serif; color: var(--red); }
+.hjelp-del > summary::-webkit-details-marker { display: none; }
+.hjelp-del > summary::before { content: '▸'; display: inline-block; width: 1.2em; transition: transform .15s; }
+.hjelp-del[open] > summary::before { transform: rotate(90deg); }
+.hjelp-tekst { margin-top: 8px; line-height: 1.55; }
+.hjelp-tekst h3 { margin: 14px 0 4px; font-size: 1rem; }
+.hjelp-tekst ul, .hjelp-tekst ol { padding-left: 1.3em; margin: 6px 0; }
+.hjelp-tekst li { margin: 5px 0; }
+.hjelp-tekst code { background: #efe8d2; border-radius: 4px; padding: 0 5px; font-size: .9em; word-break: break-word; }
+.hjelp-innhold { columns: 1; padding-left: 1.3em; margin: 10px 0 0; }
+.hjelp-innhold a { color: var(--red); }
+.sjekkliste { list-style: none; padding-left: 0 !important; }
+@media print { .app-header, .tabs, .snow, .hjelp-del > summary::before, button { display: none !important; } .hjelp-del { box-shadow: none; break-inside: avoid; } details:not([open]) > .hjelp-tekst { display: block; } }
