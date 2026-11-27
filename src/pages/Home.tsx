@@ -133,6 +133,11 @@ export default function Home() {
               {c.status === 'closed' ? '🏆 Se resultatene' : done > 0 ? '✏️ Se og endre svarene dine' : '🥂 Begynn å smake'}
             </Link>
           </p>
+          {c.status === 'closed' && done > 0 && (
+            <p style={{ margin: '14px 0 0' }}>
+              <Link className="btn gold block" to={`/k/${c.slug}/mine`} data-testid="mine-gjetninger">🎯 Hva gjettet jeg?</Link>
+            </p>
+          )}
           {c.live_board && c.status !== 'draft' && (
             <p style={{ margin: '14px 0 0' }}>
               <Link className="btn gold block" to={`/k/${c.slug}/tavle`}>📊 Se live tavle</Link>

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getCompetition, listItems, listMyEntries, listOptions, saveEntry } from '../api/data'
+import { getCompetition, getResults, listItems, listMyEntries, listOptions, saveEntry } from '../api/data'
 import { errorMessage } from '../api/functions'
 import { useAuth } from '../auth'
 import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
 import { CommentField, TagPicker } from '../components/Taste'
-import { glassList, usedGuesses } from '../lib/guesses'
+import { glassList, guessResult, usedGuesses } from '../lib/guesses'
 import { cleanComment, cleanTags, COMMENT_MAX, isValidScore, SCORE_MAX, SCORE_MIN } from '../lib/validation'
 
 interface Draft { score: number | null; guess: string | null; comment: string; tags: string[] }
@@ -26,7 +26,9 @@ export default function Mine() {
     if (!comp) return null
     const [items, options] = await Promise.all([listItems(comp.id), listOptions(comp.id)])
     const entries = await listMyEntries(uid, items.map((i) => i.id))
-    return { comp, items, options, entries }
+    // Avsluttet: hent fasit, så du ser hva som var riktig og hvor mange du fikk.
+    const results = comp.status === 'closed' ? await getResults(comp.id).catch(() => null) : null
+    return { comp, items, options, entries, results }
   }, [slug, uid])
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
@@ -95,6 +97,9 @@ export default function Mine() {
   const open = comp.status === 'open'
   const itemIds = items.map((i) => i.id)
   const answered = items.filter((i) => savedIds.has(i.id)).length
+  const correctOf: Record<string, string | null> = Object.fromEntries((data.results?.items ?? []).map((i) => [i.item_id, i.correct_option_id]))
+  const correctLabelOf: Record<string, string | null> = Object.fromEntries((data.results?.items ?? []).map((i) => [i.item_id, i.correct_label]))
+  const fasit = guessResult(itemIds, (id) => data.entries.find((x) => x.item_id === id)?.guess_option_id, correctOf)
   const guessLabel = (id: string | null) => (id ? options.find((o) => o.id === id)?.label ?? '?' : 'Vet ikke')
 
   return (
@@ -105,6 +110,16 @@ export default function Mine() {
       </div>
       <p className="muted-on-bg" style={{ margin: '0 0 12px' }}>{comp.title} · {answered} av {items.length} glass besvart</p>
       {open && <p className="muted-on-bg small" style={{ margin: '0 0 12px' }}>Trykk på et tall for å endre scoren. Endringer lagres med en gang.</p>}
+      {!open && data.results && (
+        <div className="card" data-testid="mine-fasit-sammendrag">
+          <h2 style={{ marginTop: 0 }}>🎯 Du gjettet riktig på {fasit.hits} av {fasit.withFasit}</h2>
+          <p className="soft" style={{ margin: 0 }}>
+            {fasit.hits > 0 && fasit.hits === fasit.withFasit ? '🎉 Alle riktige! ' : ''}
+            {fasit.withFasit - fasit.guessed > 0 ? `Du svarte «vet ikke» eller lot være på ${fasit.withFasit - fasit.guessed}. ` : ''}
+            Under ser du fasit for hvert glass.
+          </p>
+        </div>
+      )}
 
       {items.map((it, i) => {
         const d = drafts[it.id] ?? EMPTY
@@ -113,7 +128,12 @@ export default function Mine() {
           const sv = data.entries.find((x) => x.item_id === it.id)
           return (
             <section key={it.id} className="card" aria-label={`Glass ${i + 1}`}>
-              <h2 style={{ margin: 0 }}>Glass {i + 1}</h2>
+              <div className="row between"><h2 style={{ margin: 0 }}>Glass {i + 1}</h2>
+                {data.results && fasit.rows[i]?.status === 'riktig' && <span className="badge ok" data-testid={`fasit-status-${i + 1}`}>✓ Riktig</span>}
+                {data.results && fasit.rows[i]?.status === 'feil' && <span className="badge bad" data-testid={`fasit-status-${i + 1}`}>✗ Feil</span>}
+                {data.results && fasit.rows[i]?.status === 'ingen' && <span className="badge" data-testid={`fasit-status-${i + 1}`}>Ikke gjettet</span>}
+              </div>
+              {data.results && correctLabelOf[it.id] && <p style={{ margin: '8px 0 0' }} data-testid={`fasit-${i + 1}`}><strong>Fasit:</strong> {correctLabelOf[it.id]}</p>}
               {sv ? (
                 <>
                   <p style={{ margin: '10px 0 4px' }}><strong>Score:</strong> <span data-testid={`score-${i + 1}`}>{sv.score}</span> av 10</p>

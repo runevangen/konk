@@ -1583,6 +1583,31 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await ctx.close()
   }
 
+  {
+    // --- Avsluttet: Mine svar viser fasit, riktig/feil per glass og hvor mange du fikk riktig ---
+    const mk = (n, guess, score) => ({ id: 'e' + n, user_id: UID, item_id: 'i' + n, score, guess_option_id: guess, comment: null, tags: [] })
+    const state = freshState({ status: 'closed', entries: { i1: mk(1, 'o2', 8), i2: mk(2, 'o3', 6), i3: mk(3, null, 9) } })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByTestId('mine-gjetninger').click()                       // fra forsiden: ett trykk
+    await page.getByTestId('mine-fasit-sammendrag').waitFor()
+    const sam = await page.getByTestId('mine-fasit-sammendrag').innerText()
+    assert.ok(/riktig på 1 av 6/.test(sam), sam)
+    assert.ok(/vet ikke/.test(sam) && /4/.test(sam), 'forteller hvor mange du ikke gjettet')
+    assert.ok(/Riktig/.test(await page.getByTestId('fasit-status-1').innerText()))
+    assert.ok(/Feil/.test(await page.getByTestId('fasit-status-2').innerText()))
+    assert.ok(/Ikke gjettet/.test(await page.getByTestId('fasit-status-3').innerText()))
+    assert.ok(/Fasit:.*Julebrus A/.test(await page.getByTestId('fasit-1').innerText()), 'fasit står ved hvert glass')
+    assert.strictEqual(await page.getByRole('radio').count(), 0, 'avsluttet: ingenting å endre')
+    await shot(page, '48-mine-fasit')
+    await page.goto(BASE + '/k/julebrustest/resultat')                       // og fra resultatsiden
+    await page.getByTestId('til-mine-gjetninger').click()
+    await page.getByTestId('mine-fasit-sammendrag').waitFor()
+    ok('avsluttet: Mine svar viser antall riktige og fasit per glass, nåbar fra forsiden og resultatsiden')
+    await ctx.close()
+  }
+
   // --- Reduced motion ---
   {
     const state = freshState()
