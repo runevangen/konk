@@ -46,7 +46,10 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
   const timers = useRef<Record<Id, number>>({})
   const chain = useRef<Promise<void>>(Promise.resolve())
 
-  const idx = Math.min(Math.max((Number(params.get('glass')) || 1) - 1, 0), Math.max(items.length - 1, 0))
+  // Uten ?glass= starter vi på første glass du ikke har svart på (ikke alltid glass 1), eller glass 1 når alt er besvart.
+  const firstUnanswered = items.findIndex((it) => !initial[it.id])
+  const startIdx = firstUnanswered >= 0 ? firstUnanswered : 0
+  const idx = Math.min(Math.max((Number(params.get('glass')) || startIdx + 1) - 1, 0), Math.max(items.length - 1, 0))
   const item = items[idx]
   const setIdx = (i: number) => { flushAll(); setParams({ glass: String(i + 1) }, { replace: true }); window.scrollTo({ top: 0 }) }
 
@@ -127,22 +130,26 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
         </div>
       </nav>
 
-      <section key={item.id} className="card" style={{ marginTop: 16 }} aria-labelledby="glass-h">
-        <h2 id="glass-h">Glass {idx + 1} av {items.length}{item.label && item.label !== String(idx + 1) ? ` – ${item.label}` : ''}</h2>
+      <section key={item.id} className="card edit-card" style={{ marginTop: 16 }} aria-labelledby="glass-h">
+        <header className="glass-band">
+          <h2 id="glass-h">Glass {idx + 1} av {items.length}{item.label && item.label !== String(idx + 1) && item.label !== `Glass ${idx + 1}` ? ` – ${item.label}` : ''}</h2>
+        </header>
 
-        <fieldset className="score-grid" disabled={locked} style={{ display: 'grid' }}>
-          <legend className="sr-only">Score fra {SCORE_MIN} til {SCORE_MAX}</legend>
-          {Array.from({ length: SCORE_MAX }, (_, k) => k + 1).map((n) => (
-            <label key={`${item.id}-${n}`}>
-              <input type="radio" name={`score-${item.id}`} value={n} checked={d.score === n} onChange={() => update(item.id, { score: n }, true)} />
-              <span className={d.score === n ? 'on' : ''} data-on={d.score === n ? '1' : '0'}>{n}</span>
-            </label>
-          ))}
+        <fieldset className="edit-section" disabled={locked}>
+          <legend>Score</legend>
+          <p className="soft small" style={{ margin: '0 0 6px' }}>{SCORE_MIN} = uspiselig, {SCORE_MAX} = perfekt</p>
+          <div className="score-grid" role="radiogroup" aria-label={`Score fra ${SCORE_MIN} til ${SCORE_MAX}`}>
+            {Array.from({ length: SCORE_MAX }, (_, k) => k + 1).map((n) => (
+              <label key={`${item.id}-${n}`}>
+                <input type="radio" name={`score-${item.id}`} value={n} checked={d.score === n} onChange={() => update(item.id, { score: n }, true)} />
+                <span className={d.score === n ? 'on' : ''} data-on={d.score === n ? '1' : '0'}>{n}</span>
+              </label>
+            ))}
+          </div>
         </fieldset>
-        <p className="soft small" style={{ marginTop: -6 }}>Score: 1 = uspiselig, 10 = perfekt julebrus.</p>
 
         {options.length > 0 && (
-          <fieldset disabled={locked}>
+          <fieldset className="edit-section" disabled={locked}>
             <legend>Hva tror du det er?</legend>
             <div className="option-list">
               <label key={`${item.id}-none`}><input type="radio" name={`guess-${item.id}`} checked={d.guess === null} onChange={() => update(item.id, { guess: null }, true)} /><span className={d.guess === null ? 'on' : ''}>Vet ikke</span></label>
@@ -153,11 +160,12 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
           </fieldset>
         )}
 
-        <fieldset disabled={locked}>
+        <fieldset className="edit-section" disabled={locked}>
           <legend>Hvordan smaker det? <span className="soft">(valgfritt)</span></legend>
           <TagPicker name={item.id} value={d.tags} disabled={locked} onChange={(tags) => update(item.id, { tags }, true)} />
         </fieldset>
 
+        <div className="edit-section" style={{ marginBottom: 0 }}>
         <CommentField id="comment" value={d.comment} maxLength={COMMENT_MAX} disabled={locked} counter
           onChange={(v) => update(item.id, { comment: v }, false)} onBlur={() => { if (timers.current[item.id]) flushAll() }} />
         <div className="row between small soft" style={{ marginTop: 6 }}>
@@ -168,6 +176,7 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
             {st === 'needscore' && 'Velg en score for å lagre.'}
             {st === 'error' && `Kunne ikke lagre: ${saveError ?? ''}`}
           </span>
+        </div>
         </div>
       </section>
 

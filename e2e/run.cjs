@@ -1397,6 +1397,23 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     ok('storskjerm for konkurranse: live med kode og QR, avsløring fra bunnen med Neste og piltaster, oppsummering med topp 10 og sitat, bare admin')
   }
 
+  {
+    // --- Glass for glass: starter på første ubesvarte (f.eks. fra QR-koden), og tittelen gjentar ikke «Glass 1» ---
+    const mk = (n) => ({ id: 'e' + n, user_id: UID, item_id: 'i' + n, score: 6, guess_option_id: null, comment: null, tags: [] })
+    const state = freshState({ status: 'open', entries: { i1: mk(1), i2: mk(2), i3: mk(3) } })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/kode/PMEC')
+    await page.getByRole('heading', { name: /Glass 4 av 6/ }).waitFor({ timeout: 8000 })
+    assert.strictEqual(await page.locator('#glass-h').innerText(), 'Glass 4 av 6', 'ingen «– Glass 4» etter tittelen')
+    assert.ok(await page.locator('.glass-band').isVisible() && /Score/.test(await page.locator('.edit-section legend').first().innerText()), 'samme kort som i Mine svar')
+    await page.goto(BASE + '/k/julebrustest?glass=1')
+    await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor()
+    ok('glass for glass: nytt kortutseende, starter på første ubesvarte, ren tittel')
+    await ctx.close()
+  }
+
   // --- Reduced motion ---
   {
     const state = freshState()
