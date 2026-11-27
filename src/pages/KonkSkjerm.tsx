@@ -6,7 +6,7 @@ import type { Competition, GuessOption, Item, LiveBoard, Profile, Results, Resul
 import { GlassPanel } from '../components/GlassPanel'
 import { Qr } from '../components/Qr'
 import { Loading } from '../components/ui'
-import { formatPercent, formatScore, pluralize, rankBy, scoreBarWidth, toppTittel } from '../lib/format'
+import { formatPercent, formatScore, plassTekst, pluralize, rankBy, scoreBarWidth, toppTittel } from '../lib/format'
 import { placeLabel } from '../lib/quiz'
 import { tasteProfile } from '../lib/validation'
 
@@ -85,7 +85,7 @@ export default function KonkSkjerm() {
   const liveRows = useMemo(() => (board ? rankBy(board.items, (i) => i.avg_score) : []), [board])
   const visAlt = closed || visHemmelig || !!board?.names
   const officeName = (id: string | number | null) => board?.offices.find((o) => String(o.office_id) === String(id))?.name ?? results?.offices.find((o) => String(o.office_id) === String(id))?.name ?? ''
-  const panelFor = (itemId: string, base: { position: number; label: string | null; rank: number | null; avg: number | null; n: number; hitRate: number | null; byOffice: { office_id: string | number; name: string; avg_score: number | null; n: number }[] }) => (
+  const panelFor = (itemId: string, base: { delt?: boolean; position: number; label: string | null; rank: number | null; avg: number | null; n: number; hitRate: number | null; byOffice: { office_id: string | number; name: string; avg_score: number | null; n: number }[] }) => (
     <GlassPanel {...base} entries={(admin?.entries ?? []).filter((e) => e.item_id === itemId)} options={admin?.options ?? []} correctId={admin?.answers[itemId]}
       profiles={admin?.profiles ?? []} officeName={officeName} reveal={visAlt} canToggle={!closed} onToggle={() => setVisHemmelig((v) => !v)} onClose={() => setSel(null)} />
   )
@@ -133,7 +133,7 @@ export default function KonkSkjerm() {
           </div>
           {sel && (() => {
             const hit = rows.find((r) => r.row.item_id === sel)
-            return hit ? panelFor(sel, { position: hit.row.position, label: admin ? (admin.options.find((o) => o.id === admin.answers[sel])?.label ?? null) : null, rank: hit.row.avg_score != null ? hit.rank : null, avg: hit.row.avg_score, n: hit.row.n, hitRate: hit.row.hit_rate, byOffice: hit.row.by_office }) : null
+            return hit ? panelFor(sel, { delt: hit.row.avg_score != null && rows.filter((x) => x.rank === hit.rank && x.row.avg_score != null).length > 1, position: hit.row.position, label: admin ? (admin.options.find((o) => o.id === admin.answers[sel])?.label ?? null) : null, rank: hit.row.avg_score != null ? hit.rank : null, avg: hit.row.avg_score, n: hit.row.n, hitRate: hit.row.hit_rate, byOffice: hit.row.by_office }) : null
           })()}
           {!sel && <aside className="skjerm-side">
             <div className="skjerm-qrboks"><Qr code={comp.code} /><p className="skjerm-label"><strong>Skann for å bli med</strong></p></div>
@@ -180,18 +180,19 @@ export default function KonkSkjerm() {
   }
   if (step <= total) {
     const { rank, row } = reveal[step - 1]
-    return wrap(<><RevealGlass rank={rank} row={row} comments={results.comments} isWinner={rank === 1} />{controls}</>)
+    return wrap(<><RevealGlass rank={rank} row={row} comments={results.comments} isWinner={rank === 1} delt={ranked.filter((x) => x.rank === rank && x.row.item_id !== row.item_id).map((x) => x.row)} />{controls}</>)
   }
   return wrap(<><Summary results={results} ranked={ranked} board={liveOff ? null : board} sel={sel} onSel={setSel} panelFor={panelFor} /> {controls}</>)
 }
 
-function RevealGlass({ rank, row, comments, isWinner }: { rank: number; row: ResultsItem; comments: Results['comments']; isWinner: boolean }) {
+function RevealGlass({ rank, row, comments, isWinner, delt }: { rank: number; row: ResultsItem; comments: Results['comments']; isWinner: boolean; delt: ResultsItem[] }) {
   const mine = comments.filter((c) => c.item_id === row.item_id)
   const quote = mine.find((c) => c.featured) ?? mine[0]
   const taste = tasteProfile(row.tags, row.n).slice(0, 4)
   return (
     <div className="skjerm-reveal" key={row.item_id} data-testid="skjerm-avslort">
-      <p className="skjerm-label">{isWinner ? '🏆 Vinneren' : `Plass ${rank}`}</p>
+      <p className="skjerm-label" data-testid="skjerm-plass">{isWinner ? `🏆 ${delt.length ? 'Delt førsteplass' : 'Vinneren'}` : plassTekst(rank, delt.length > 0)}</p>
+      {delt.length > 0 && <p className="skjerm-label" data-testid="skjerm-delt-med" style={{ marginTop: 0 }}>Sammen med {delt.map((d) => `${d.correct_label ?? `Glass ${d.position}`} (glass ${d.position})`).join(' og ')}</p>}
       <div className="skjerm-reveal-hode">
         <span className="skjerm-plass">{rank}</span>
         <div>
@@ -216,7 +217,7 @@ function RevealGlass({ rank, row, comments, isWinner }: { rank: number; row: Res
   )
 }
 
-type PanelBase = { position: number; label: string | null; rank: number | null; avg: number | null; n: number; hitRate: number | null; byOffice: { office_id: string | number; name: string; avg_score: number | null; n: number }[] }
+type PanelBase = { delt?: boolean; position: number; label: string | null; rank: number | null; avg: number | null; n: number; hitRate: number | null; byOffice: { office_id: string | number; name: string; avg_score: number | null; n: number }[] }
 function Summary({ results, ranked, board, sel, onSel, panelFor }: { results: Results; ranked: { rank: number; row: ResultsItem }[]; board: LiveBoard | null; sel: string | null; onSel: (id: string | null) => void; panelFor: (itemId: string, base: PanelBase) => React.ReactNode }) {
   const people = board ? rankBy(board.people.filter((p) => p.guesses > 0), (p) => p.hits).slice(0, 10) : []
   const offices = results.offices
@@ -242,7 +243,7 @@ function Summary({ results, ranked, board, sel, onSel, panelFor }: { results: Re
               <li key={row.item_id} className={`rank-row big klikkbar-rad ${sel === row.item_id ? 'valgt' : ''}`} data-testid="skjerm-topp" role="button" tabIndex={0} aria-pressed={sel === row.item_id}
                 onClick={() => onSel(sel === row.item_id ? null : row.item_id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSel(sel === row.item_id ? null : row.item_id) } }}>
                 <span className="rank-n">{placeLabel(rank)}</span>
-                <span className="rank-name"><strong>{row.correct_label ?? `Glass ${row.position}`}</strong> <span className="soft small">· glass {row.position}</span></span>
+                <span className="rank-name"><strong>{row.correct_label ?? `Glass ${row.position}`}</strong> <span className="soft small">· glass {row.position}</span>{ranked.filter((x) => x.rank === rank).length > 1 && <span className="delt-merke" data-testid="delt-merke">delt {rank}. plass</span>}</span>
                 <span className="rank-pts"><strong>{formatScore(row.avg_score, 2)}</strong></span>
               </li>
             ))}
@@ -250,7 +251,7 @@ function Summary({ results, ranked, board, sel, onSel, panelFor }: { results: Re
         </div>
         {sel && (() => {
           const hit = ranked.find((r) => r.row.item_id === sel)
-          return hit ? panelFor(sel, { position: hit.row.position, label: hit.row.correct_label, rank: hit.rank, avg: hit.row.avg_score, n: hit.row.n, hitRate: hit.row.hit_rate, byOffice: hit.row.by_office }) : null
+          return hit ? panelFor(sel, { delt: ranked.filter((x) => x.rank === hit.rank).length > 1, position: hit.row.position, label: hit.row.correct_label, rank: hit.rank, avg: hit.row.avg_score, n: hit.row.n, hitRate: hit.row.hit_rate, byOffice: hit.row.by_office }) : null
         })()}
         {!sel && <div>
           {offices.length > 0 && (<><h2>Kontorene</h2>{offices.map((o) => <p key={o.office_id} className="skjerm-label" style={{ margin: '2px 0' }} data-testid="skjerm-kontor"><strong>{o.name}</strong>{' '}{o.participants > 0 ? `snitt ${formatScore(o.avg_score, 2)} · ${formatPercent(o.hit_rate)} riktige` : 'ingen svar'}</p>)}</>)}

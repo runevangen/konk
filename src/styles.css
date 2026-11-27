@@ -397,3 +397,4 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .skjerm .glasspanel .btn.ghost { color: var(--ink); border-color: var(--border-strong); background: transparent; }
 .skjerm .glasspanel .quote small { color: var(--soft); }
 .rank-row .rank-n { min-width: 3.4em; white-space: nowrap; }
+.delt-merke { margin-left: 10px; background: var(--gold, #e8b84a); color: #2a1d00; border-radius: 999px; padding: 1px 10px; font: 700 .75em system-ui, sans-serif; white-space: nowrap; }
