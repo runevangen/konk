@@ -253,3 +253,9 @@ export async function getQuizOnHome(): Promise<boolean> {
 export async function setQuizOnHome(on: boolean) {
   check(await supabase.from('konk_settings').upsert({ key: 'quiz_on_home', value: on, updated_at: new Date().toISOString() }, { onConflict: 'key' }))
 }
+
+export interface MyStanding { n: number; total: number; my_hits: number | null; my_guesses: number | null; best: number | null; worst: number | null; avg: number | null; rank: number | null; tied: number | null }
+/** Hvor mange riktige du fikk mot beste, dårligste og snittet (bare tall; avsluttede konkurranser). */
+export async function getMyStanding(competitionId: Id) {
+  return check(await supabase.rpc('konk_my_standing', { p_competition: competitionId })) as MyStanding
+}

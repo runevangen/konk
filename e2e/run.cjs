@@ -76,6 +76,7 @@ function makeBackend(state) {
       if (req.method() === 'POST' || req.method() === 'PATCH') { const b = req.postDataJSON(); if (b.key === 'quiz_on_home') state.quizOn = b.value; state.settingsWrites = (state.settingsWrites || 0) + 1; return json([], 201) }
       return single([{ value: state.quizOn !== false }])
     }
+    if (p.endsWith('/rpc/konk_my_standing')) return json(state.standing === undefined ? { n: 7, total: 6, my_hits: 1, my_guesses: 2, best: 4, worst: 0, avg: 1.9, rank: 5, tied: 1 } : state.standing)
     if (p.endsWith('/rpc/konk_join_by_code')) {
       const b = req.postDataJSON(); const list = state.comps || [{ ...COMP, status: state.status }]
       const c = list.find((x) => x.code === String(b.p_code).toUpperCase() && (state.admin || x.status !== 'draft'))
@@ -1599,6 +1600,14 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.ok(/Feil/.test(await page.getByTestId('fasit-status-2').innerText()))
     assert.ok(/Ikke gjettet/.test(await page.getByTestId('fasit-status-3').innerText()))
     assert.ok(/Fasit:.*Julebrus A/.test(await page.getByTestId('fasit-1').innerText()), 'fasit står ved hvert glass')
+    // sammenligning med de andre: beste, snitt, du og dårligste, og hvilken plass du fikk
+    await page.getByTestId('mine-sammenligning').waitFor()
+    assert.strictEqual(await page.getByTestId('sml-plass').innerText(), 'Du ble nr. 5 av 7')
+    assert.strictEqual(await page.getByTestId('sml-Beste').locator('.sml-tall').innerText(), '4')
+    assert.strictEqual(await page.getByTestId('sml-Snitt').locator('.sml-tall').innerText(), '1,9')
+    assert.strictEqual(await page.getByTestId('sml-Du').locator('.sml-tall').innerText(), '1')
+    assert.strictEqual(await page.getByTestId('sml-Dårligste').locator('.sml-tall').innerText(), '0')
+    assert.ok(await page.getByTestId('sml-Du').evaluate((el) => el.classList.contains('du')), 'din rad er markert')
     assert.strictEqual(await page.getByRole('radio').count(), 0, 'avsluttet: ingenting å endre')
     await shot(page, '48-mine-fasit')
     await page.goto(BASE + '/k/julebrustest/resultat')                       // og fra resultatsiden
@@ -1658,6 +1667,22 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.goto(BASE + '/')
     await page.getByTestId('konkurranse-kort').waitFor()                     // etter koden står den i listen
     ok('kode kreves: ny bruker ser ingenting før koden er brukt, og konkurransen huskes etterpå')
+    await ctx.close()
+  }
+
+  {
+    // --- Sammenligning skjules når for få har deltatt (ingen enkeltperson kan kjennes igjen) ---
+    const mk = (n, guess) => ({ id: 'e' + n, user_id: UID, item_id: 'i' + n, score: 7, guess_option_id: guess, comment: null, tags: [] })
+    const state = freshState({ status: 'closed', entries: { i1: mk(1, 'o2') } })
+    state.standing = { n: 2, total: 6, my_hits: 1, my_guesses: 1, best: null, worst: null, avg: null, rank: 1, tied: 1 }
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/k/julebrustest/mine')
+    await page.getByTestId('mine-sammenligning').waitFor()
+    assert.ok(/minst tre har deltatt/.test(await page.getByTestId('mine-sammenligning').innerText()))
+    assert.strictEqual(await page.getByTestId('sml-Beste').count(), 0)
+    ok('sammenligning: skjules til minst tre har deltatt')
     await ctx.close()
   }
 
