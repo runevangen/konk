@@ -34,3 +34,9 @@ export function pluralize(n: number, one: string, many: string) {
 export function toppTittel(n: number, limit = 10, hele = 'Rangering'): string {
   return n > limit ? `Topp ${limit}` : hele
 }
+
+/** «Plass 4», men «Delt 2. plass» når flere har samme, og «Delt førsteplass» for vinnerne. */
+export function plassTekst(rank: number, delt: boolean): string {
+  if (!delt) return `Plass ${rank}`
+  return rank === 1 ? 'Delt førsteplass' : `Delt ${rank}. plass`
+}

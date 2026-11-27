@@ -25,7 +25,7 @@ describe('format', () => {
   })
 })
 
-import { toppTittel } from './format'
+import { plassTekst, toppTittel } from './format'
 describe('toppTittel', () => {
   it('sier «Topp 10» bare når det er mer enn ti', () => {
     expect(toppTittel(11)).toBe('Topp 10')
@@ -33,5 +33,13 @@ describe('toppTittel', () => {
     expect(toppTittel(10)).toBe('Rangering')
     expect(toppTittel(6)).toBe('Rangering')
     expect(toppTittel(2, 10, 'Sluttresultat')).toBe('Sluttresultat')
+  })
+})
+
+describe('plassTekst', () => {
+  it('delt plass sies uttrykkelig', () => {
+    expect(plassTekst(4, false)).toBe('Plass 4')
+    expect(plassTekst(2, true)).toBe('Delt 2. plass')
+    expect(plassTekst(1, true)).toBe('Delt førsteplass')
   })
 })

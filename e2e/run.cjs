@@ -1390,7 +1390,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
       assert.ok(/Mineralvann/.test(await page.getByTestId('skjerm-avslort').innerText()) && /Plass 6/.test(await page.getByTestId('skjerm-avslort').innerText()), 'siste plass avsløres først')
       await fit(page, 'første avsløring')
       for (let k = 0; k < 4; k++) await page.keyboard.press('ArrowRight')            // piltast fungerer også
-      await page.getByText('Plass 2').first().waitFor()
+      await page.getByText('Delt 2. plass').first().waitFor()
+      assert.ok(/Sammen med .*glass \d/.test(await page.getByTestId('skjerm-delt-med').innerText()), 'delt plass sier hvem den deles med')
       await page.keyboard.press('ArrowRight')
       await page.getByText('🏆 Vinneren').waitFor()
       const vinner = await page.getByTestId('skjerm-avslort').innerText()
@@ -1402,6 +1403,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
       await page.getByTestId('skjerm-oppsummering').waitFor()
       assert.strictEqual(await page.getByTestId('skjerm-topp').count(), 6)
       assert.ok(await page.getByRole('heading', { name: 'Rangering', exact: true }).isVisible(), 'seks glass heter Rangering, ikke Topp 10')
+      assert.strictEqual(await page.getByTestId('delt-merke').count(), 2, 'begge glass på delt andreplass er merket')
+      assert.ok(/delt 2\. plass/.test(await page.getByTestId('delt-merke').first().innerText()))
       assert.strictEqual(await page.getByText('Topp 10').count(), 0)
       assert.ok(await page.getByTestId('skjerm-kommentar').innerText().then((t) => /Dagens sitat/.test(t)), 'sitatet står først i kommentarrekken')
       await page.getByTestId('skjerm-gjettere').waitFor()

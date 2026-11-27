@@ -1,4 +1,4 @@
-import { formatPercent, formatScore, pluralize } from '../lib/format'
+import { formatPercent, formatScore, plassTekst, pluralize } from '../lib/format'
 import { guessDistribution, scoreHistogram, tagCounts, visibleComments, type StatEntry, type StatOption, type StatProfile } from '../lib/glassStats'
 
 export interface PanelOffice { office_id: string | number; name: string; avg_score: number | null; n: number }
@@ -7,8 +7,8 @@ export interface PanelOffice { office_id: string | number; name: string; avg_sco
  * Alt om ett glass, til storskjermen (admin): fordeling av score, kontorene, hva folk gjettet, smak og kommentarer.
  * Gjetninger, fasit og kommentarer røper hva glasset er, så de er skjult til admin viser dem (eller konkurransen er avsluttet).
  */
-export function GlassPanel({ position, label, rank, avg, n, hitRate, byOffice, entries, options, correctId, profiles, officeName, reveal, canToggle, onToggle, onClose }: {
-  position: number; label: string | null; rank: number | null; avg: number | null; n: number; hitRate: number | null
+export function GlassPanel({ delt = false, position, label, rank, avg, n, hitRate, byOffice, entries, options, correctId, profiles, officeName, reveal, canToggle, onToggle, onClose }: {
+  delt?: boolean; position: number; label: string | null; rank: number | null; avg: number | null; n: number; hitRate: number | null
   byOffice: PanelOffice[]; entries: StatEntry[]; options: StatOption[]; correctId: string | null | undefined
   profiles: StatProfile[]; officeName: (id: string | number | null) => string; reveal: boolean; canToggle: boolean
   onToggle: () => void; onClose: () => void
@@ -26,7 +26,7 @@ export function GlassPanel({ position, label, rank, avg, n, hitRate, byOffice, e
         <button className="btn ghost small" onClick={onClose} aria-label="Lukk" data-testid="panel-lukk">✕</button>
       </div>
       <p className="soft small" style={{ margin: '2px 0 6px' }}>
-        {rank != null ? `Plass ${rank} · ` : ''}<strong>{formatScore(avg, 2)}</strong> i snitt · {pluralize(n, 'vurdering', 'vurderinger')}
+        {rank != null ? `${plassTekst(rank, delt)} · ` : ''}<strong>{formatScore(avg, 2)}</strong> i snitt · {pluralize(n, 'vurdering', 'vurderinger')}
         {byOffice.filter((o) => o.n > 0 && o.avg_score != null).map((o) => <span key={o.office_id}> · {o.name} <strong>{formatScore(o.avg_score, 1)}</strong></span>)}
       </p>
       <div className="hist" role="img" aria-label="Fordeling av score" data-testid="panel-histogram">
