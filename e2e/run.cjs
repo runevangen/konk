@@ -71,6 +71,15 @@ function makeBackend(state) {
       if (state.profileList && !q.get('id')) return json(state.profileList)
       return single([{ id: UID, display_name: 'Kari Nordmann', office_id: 'of1', anonymous: false, is_admin: !!state.admin }])
     }
+    if (state.comps && p.endsWith('/rest/v1/konk_competitions')) {
+      const m = req.method()
+      state.compCalls = state.compCalls || []
+      if (m === 'PATCH') { const c = state.comps.find((x) => x.id === eq('id')); const b = req.postDataJSON(); Object.assign(c, b); state.compCalls.push(['PATCH', c.id, b]); return json([]) }
+      if (m === 'DELETE') { state.compCalls.push(['DELETE', eq('id')]); state.comps = state.comps.filter((x) => x.id !== eq('id')); return json([]) }
+      const rows = state.comps.filter((x) => state.admin || (x.visible && x.status !== 'draft')).sort((a, b) => a.sort_order - b.sort_order)
+      if (q.get('slug')) return single(rows.filter((x) => x.slug === eq('slug')))
+      return json(rows)
+    }
     if (p.endsWith('/rest/v1/konk_competitions')) {
       const c = { ...COMP, status: state.status, live_board: state.liveOff ? false : true, live_board_names: !!state.names }
       if (q.get('slug')) return single(eq('slug') === c.slug ? [c] : [])
@@ -1129,6 +1138,69 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     }
     ok('mine svar: alltid redigerbar med autolagring (score, gjetning, kommentar), score-vakt og raske trykk')
     await ctx.close()
+  }
+
+  {
+    // --- Forsiden: admin kan skjule/vise, flytte opp og ned og slette konkurranser ---
+    const mkComps = () => [
+      { ...COMP, id: 'c1', slug: 'a', title: 'Konkurranse A', visible: true, sort_order: 10 },
+      { ...COMP, id: 'c2', slug: 'b', title: 'Konkurranse B', status: 'closed', visible: true, sort_order: 20 },
+      { ...COMP, id: 'c3', slug: 'c', title: 'Konkurranse C', visible: false, sort_order: 30 },
+    ]
+    const titles = (page) => page.locator('[data-testid="konkurranse-kort"] h2').allInnerTexts()
+    const state = freshState({ admin: true }); state.comps = mkComps()
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByText('Konkurranse C').waitFor()
+    assert.deepStrictEqual(await titles(page), ['Konkurranse A', 'Konkurranse B', 'Konkurranse C'])
+    assert.strictEqual(await page.getByTestId('usynlig-merke').count(), 1, 'admin ser at C er usynlig for andre')
+    assert.strictEqual(await page.getByRole('button', { name: /Flytt/ }).count(), 0, 'kontrollene vises først i Administrer')
+    await page.getByTestId('administrer').click()
+    // flytt B opp
+    await page.getByRole('button', { name: 'Flytt Konkurranse B opp' }).click()
+    await page.waitForFunction(() => document.querySelector('[data-testid="konkurranse-kort"] h2')?.textContent === 'Konkurranse B')
+    assert.deepStrictEqual(await titles(page), ['Konkurranse B', 'Konkurranse A', 'Konkurranse C'])
+    for (let k = 0; k < 30 && state.comps.find((x) => x.id === 'c2').sort_order !== 10; k++) await page.waitForTimeout(100)
+    assert.deepStrictEqual(state.comps.map((x) => [x.id, x.sort_order]), [['c1', 20], ['c2', 10], ['c3', 30]], 'rekkefølgen er lagret')
+    assert.strictEqual(await page.getByRole('button', { name: 'Flytt Konkurranse B opp' }).isDisabled(), true, 'øverste kan ikke flyttes opp')
+    assert.strictEqual(await page.getByRole('button', { name: 'Flytt Konkurranse C ned' }).isDisabled(), true, 'nederste kan ikke flyttes ned')
+    await shot(page, '42-forside-administrer')
+    // gjør C synlig og A usynlig
+    const grp = (t) => page.getByRole('group', { name: `Administrer ${t}` })
+    await grp('Konkurranse C').getByRole('button', { name: /Usynlig/ }).click()
+    await page.getByText('Konkurransen er synlig for alle.').waitFor()
+    await grp('Konkurranse A').getByRole('button', { name: /Synlig/ }).click()
+    await page.getByText('Konkurransen er skjult for alle andre enn deg.').waitFor()
+    assert.deepStrictEqual(state.comps.map((x) => [x.id, x.visible]), [['c1', false], ['c2', true], ['c3', true]])
+    // slett: krever SLETT, og avbryt gjør ingenting
+    await grp('Konkurranse B').getByRole('button', { name: /Slett/ }).click()
+    const dlg = page.getByRole('alertdialog', { name: 'Slett Konkurranse B' })
+    assert.strictEqual(await dlg.getByRole('button', { name: 'Slett for alltid' }).isDisabled(), true)
+    await dlg.getByLabel(/Skriv SLETT/).fill('slett')
+    assert.strictEqual(await dlg.getByRole('button', { name: 'Slett for alltid' }).isDisabled(), false)
+    await dlg.getByRole('button', { name: 'Avbryt' }).click()
+    assert.strictEqual(state.comps.length, 3, 'avbrutt sletting rører ingenting')
+    await grp('Konkurranse B').getByRole('button', { name: /Slett/ }).click()
+    await page.getByRole('alertdialog', { name: 'Slett Konkurranse B' }).getByLabel(/Skriv SLETT/).fill('SLETT')
+    await page.getByRole('button', { name: 'Slett for alltid' }).click()
+    await page.getByText('«Konkurranse B» er slettet.').waitFor()
+    assert.deepStrictEqual(await titles(page), ['Konkurranse A', 'Konkurranse C'])
+    assert.deepStrictEqual(state.compCalls.at(-1), ['DELETE', 'c2'])
+    // etter reload: lagret rekkefølge og skjul gjelder
+    await page.reload(); await page.getByText('Konkurranse C').waitFor()
+    assert.strictEqual(await page.getByTestId('usynlig-merke').count(), 1)
+    await ctx.close()
+    // vanlig bruker: ser bare synlige, ingen administrer-knapp
+    const s2 = freshState({ admin: false }); s2.comps = state.comps
+    const u = await newPage(browser, s2)
+    await u.page.goto(BASE + '/login'); await u.page.locator('#name').fill('Kari'); await u.page.locator('#pin').fill('123456'); await u.page.getByRole('button', { name: 'Logg inn' }).click()
+    await u.page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await u.page.getByText('Konkurranse C').waitFor()
+    assert.deepStrictEqual(await titles(u.page), ['Konkurranse C'])
+    assert.strictEqual(await u.page.getByTestId('administrer').count(), 0)
+    ok('forsiden: admin skjuler/viser, flytter opp og ned og sletter (med SLETT-bekreftelse); andre ser bare synlige')
+    await u.ctx.close()
   }
 
   // --- Reduced motion ---

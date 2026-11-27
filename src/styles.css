@@ -317,3 +317,12 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .edit-card select, .edit-card textarea { width: 100%; }
 .edit-section legend { float: left; width: 100%; margin-bottom: 2px; }
 .edit-section legend + * { clear: both; }
+
+/* Forsiden: admin-kontroller på konkurransene */
+.card.dim { opacity: .72; border: 2px dashed var(--border-strong); }
+.manage-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.manage-bar .btn { min-width: 44px; }
+.btn.danger { color: var(--red); border-color: var(--red); }
+.btn.danger-solid { background: var(--red); color: var(--on-red); }
+.btn.danger-solid:disabled { opacity: .45; }
+.confirm-box { background: #fff3f0; border: 2px solid var(--red); border-radius: 12px; padding: 12px; margin: 0 0 12px; }
