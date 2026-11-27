@@ -104,7 +104,7 @@ export default function Home() {
       )}
       <div className="row between" style={{ margin: '0 0 8px' }}>
         <p className="muted-on-bg" style={{ margin: 0 }}>Velg en konkurranse.</p>
-        {isAdmin && <button className={`btn small ${manage ? 'gold' : 'ghost'}`} onClick={() => { setManage((m) => !m); setConfirmId(null); setTyped(''); setMsg(null) }} aria-pressed={manage} data-testid="administrer">{manage ? 'Ferdig' : '⚙️ Administrer'}</button>}
+        {isAdmin && <button className={`btn small ${manage ? 'gold' : 'ghost-light'}`} onClick={() => { setManage((m) => !m); setConfirmId(null); setTyped(''); setMsg(null) }} aria-pressed={manage} data-testid="administrer">{manage ? 'Ferdig' : '⚙️ Administrer'}</button>}
       </div>
       {msg && <p role={msg.ok ? 'status' : 'alert'} className={msg.ok ? 'muted-on-bg' : 'on-bg-error'} data-testid="forside-melding" style={{ fontWeight: 700 }}>{msg.text}</p>}
       {loading && <Loading />}

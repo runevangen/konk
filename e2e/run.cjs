@@ -1210,6 +1210,11 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.deepStrictEqual(await titles(page), ['Konkurranse A', 'Konkurranse B', 'Konkurranse C'])
     assert.strictEqual(await page.getByTestId('usynlig-merke').count(), 1, 'admin ser at C er usynlig for andre')
     assert.strictEqual(await page.getByRole('button', { name: /Flytt/ }).count(), 0, 'kontrollene vises først i Administrer')
+    // «Administrer» står på mørk bakgrunn og må være lesbar: lys tekst, ikke mørk
+    const farge = await page.getByTestId('administrer').evaluate((el) => getComputedStyle(el).color)
+    const [r, g, b] = farge.match(/\d+/g).map(Number)
+    assert.ok(r > 200 && g > 200 && b > 150, `Administrer har lys tekst (fikk ${farge})`)
+    await shot(page, '42b-forside-administrer-av')
     await page.getByTestId('administrer').click()
     // flytt B opp
     await page.getByRole('button', { name: 'Flytt Konkurranse B opp' }).click()
