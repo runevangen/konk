@@ -47,3 +47,25 @@ describe('isWeakPin', () => {
     expect(isWeakPin('123')).toBe(false)
   })
 })
+
+import { cleanTags, tasteProfile, toggleTag } from './validation'
+describe('smaksmerker', () => {
+  it('cleanTags beholder bare kjente merker, uten dubletter, i fast rekkefølge', () => {
+    expect(cleanTags(['Bitter', 'Ukjent', 'Søt', 'Søt'])).toEqual(['Søt', 'Bitter'])
+    expect(cleanTags(null)).toEqual([])
+  })
+  it('toggleTag slår av og på', () => {
+    expect(toggleTag([], 'Sur')).toEqual(['Sur'])
+    expect(toggleTag(['Sur', 'Søt'], 'Sur')).toEqual(['Søt'])
+    expect(toggleTag(['Søt'], 'Hacket')).toEqual(['Søt'])
+  })
+  it('tasteProfile sorterer på antall, og skjuler ved færre enn to svar', () => {
+    expect(tasteProfile({ Søt: 2, Krydret: 5, Sur: 5 }, 7).map((t) => t.tag)).toEqual(['Krydret', 'Sur', 'Søt'])
+    expect(tasteProfile({ Søt: 1 }, 1)).toEqual([])
+    expect(tasteProfile({}, 10)).toEqual([])
+    expect(tasteProfile({ Hacket: 3 }, 5)).toEqual([])
+  })
+  it('andel er antall delt på alle som vurderte glasset', () => {
+    expect(tasteProfile({ Søt: 3 }, 6)[0].share).toBe(0.5)
+  })
+})

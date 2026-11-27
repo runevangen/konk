@@ -326,3 +326,15 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .btn.danger-solid { background: var(--red); color: var(--on-red); }
 .btn.danger-solid:disabled { opacity: .45; }
 .confirm-box { background: #fff3f0; border: 2px solid var(--red); border-radius: 12px; padding: 12px; margin: 0 0 12px; }
+
+/* Smaksmerker */
+.tag-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 4px; }
+.tag { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 2px solid var(--border-strong); background: #fff; color: var(--ink); font: 600 .95rem inherit; cursor: pointer; }
+.tag.on { background: var(--red); color: var(--on-red); border-color: var(--red); }
+.tag:disabled { opacity: .6; }
+.taste-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: .95rem; }
+.taste-row .lbl { width: 5.5em; font-weight: 600; }
+.taste-row .bar { flex: 1; height: 12px; background: #fff; border: 1px solid var(--border-strong); border-radius: 999px; overflow: hidden; }
+.taste-row .bar i { display: block; height: 100%; background: var(--gold, #e8b84a); }
+.quote { background: #fff8e1; border-left: 6px solid var(--gold, #e8b84a); border-radius: 10px; padding: 12px 14px; margin: 10px 0; font: italic 1.1rem Georgia, serif; }
+.quote .who { font: .85rem system-ui, sans-serif; opacity: .8; margin-top: 4px; font-style: normal; }

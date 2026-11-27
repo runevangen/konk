@@ -37,3 +37,23 @@ export function cleanComment(c: string): string | null {
 export function validateSlug(s: string): string | null {
   return /^[a-z0-9]+(-[a-z0-9]+)*$/.test(s) ? null : 'Slug kan bare ha små bokstaver, tall og bindestrek.'
 }
+
+/** Hurtigvalg for smak. Samme liste som sjekk-regelen i databasen (konk_entries_tags_ok). */
+export const TASTE_TAGS = ['Søt', 'Krydret', 'Bitter', 'Fruktig', 'Maltig', 'Sur', 'Lett', 'Kraftig'] as const
+export type TasteTag = (typeof TASTE_TAGS)[number]
+/** Bare kjente merker, uten dubletter, i fast rekkefølge. */
+export function cleanTags(tags: readonly string[] | null | undefined): TasteTag[] {
+  const set = new Set(tags ?? [])
+  return TASTE_TAGS.filter((t) => set.has(t))
+}
+/** Slår et merke av/på i en liste. */
+export function toggleTag(tags: readonly string[], tag: string): TasteTag[] {
+  return cleanTags(tags.includes(tag) ? tags.filter((t) => t !== tag) : [...tags, tag])
+}
+/** Smaksprofil for ett glass: de vanligste merkene først. Vises bare når minst to har satt merker, så ingen enkeltperson kan kjennes igjen. */
+export function tasteProfile(counts: Record<string, number> | null | undefined, n: number, minVoters = 2): { tag: string; count: number; share: number }[] {
+  const entries = Object.entries(counts ?? {}).filter(([t]) => (TASTE_TAGS as readonly string[]).includes(t))
+  if (!entries.length || n < minVoters) return []
+  return entries.map(([tag, count]) => ({ tag, count, share: n ? count / n : 0 }))
+    .sort((a, b) => b.count - a.count || TASTE_TAGS.indexOf(a.tag as TasteTag) - TASTE_TAGS.indexOf(b.tag as TasteTag))
+}

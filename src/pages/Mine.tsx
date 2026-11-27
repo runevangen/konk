@@ -5,11 +5,12 @@ import { errorMessage } from '../api/functions'
 import { useAuth } from '../auth'
 import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
-import { cleanComment, COMMENT_MAX, isValidScore, SCORE_MAX, SCORE_MIN } from '../lib/validation'
+import { CommentField, TagPicker } from '../components/Taste'
+import { cleanComment, cleanTags, COMMENT_MAX, isValidScore, SCORE_MAX, SCORE_MIN } from '../lib/validation'
 
-interface Draft { score: number | null; guess: string | null; comment: string }
+interface Draft { score: number | null; guess: string | null; comment: string; tags: string[] }
 type SaveState = 'idle' | 'saving' | 'saved' | 'needscore' | 'error'
-const EMPTY: Draft = { score: null, guess: null, comment: '' }
+const EMPTY: Draft = { score: null, guess: null, comment: '', tags: [] }
 
 /**
  * Alle egne svar på én side. Mens konkurransen er åpen er hvert kort redigerbart rett i oversikten,
@@ -42,7 +43,7 @@ export default function Mine() {
     const d: Record<string, Draft> = {}
     for (const it of data.items) {
       const e = data.entries.find((x) => x.item_id === it.id)
-      d[it.id] = e ? { score: e.score, guess: e.guess_option_id, comment: e.comment ?? '' } : { ...EMPTY }
+      d[it.id] = e ? { score: e.score, guess: e.guess_option_id, comment: e.comment ?? '', tags: cleanTags(e.tags) } : { ...EMPTY }
     }
     draftsRef.current = d
     setDrafts(d)
@@ -57,7 +58,7 @@ export default function Mine() {
       if (!d || !isValidScore(d.score)) { setStatus((s) => ({ ...s, [id]: 'needscore' })); return }
       setStatus((s) => ({ ...s, [id]: 'saving' }))
       try {
-        await saveEntry({ user_id: uid, item_id: id, score: d.score, guess_option_id: d.guess, comment: cleanComment(d.comment) })
+        await saveEntry({ user_id: uid, item_id: id, score: d.score, guess_option_id: d.guess, comment: cleanComment(d.comment), tags: cleanTags(d.tags) })
         setSavedIds((s) => new Set(s).add(id))
         setStatus((s) => ({ ...s, [id]: dirty.current.has(id) ? 'saving' : 'saved' }))
       } catch (e) {
@@ -115,6 +116,7 @@ export default function Mine() {
                 <>
                   <p style={{ margin: '10px 0 4px' }}><strong>Score:</strong> <span data-testid={`score-${i + 1}`}>{sv.score}</span> av 10</p>
                   <p style={{ margin: '0 0 4px' }}><strong>Gjetter på:</strong> {guessLabel(sv.guess_option_id)}</p>
+                  {(sv.tags?.length ?? 0) > 0 && <p style={{ margin: '0 0 4px' }}><strong>Smak:</strong> {sv.tags!.join(', ')}</p>}
                   <p style={{ margin: 0 }}><strong>Kommentar:</strong> {sv.comment ? sv.comment : <span className="soft">ingen</span>}</p>
                 </>
               ) : <p className="soft" style={{ margin: '10px 0 0' }}>Ikke besvart.</p>}
@@ -149,10 +151,13 @@ export default function Mine() {
                 </select>
               </div>
             )}
+            <div className="edit-section">
+              <p className="field" style={{ margin: '0 0 4px', fontWeight: 700 }}>Hvordan smaker det? <span className="soft" style={{ fontWeight: 400 }}>(valgfritt)</span></p>
+              <TagPicker name={it.id} value={d.tags} onChange={(tags) => update(it.id, { tags }, true)} />
+            </div>
             <div className="edit-section" style={{ marginBottom: 0 }}>
-              <label className="field" htmlFor={`mine-kommentar-${it.id}`}>Kommentar <span className="soft">(valgfri)</span></label>
-              <textarea id={`mine-kommentar-${it.id}`} value={d.comment} maxLength={COMMENT_MAX} placeholder="Hva smakte du?"
-                onChange={(ev) => update(it.id, { comment: ev.target.value }, false)} onBlur={() => { if (timers.current[it.id]) { clearTimeout(timers.current[it.id]); delete timers.current[it.id]; persist(it.id) } }} />
+              <CommentField id={`mine-kommentar-${it.id}`} value={d.comment} maxLength={COMMENT_MAX}
+                onChange={(v) => update(it.id, { comment: v }, false)} onBlur={() => { if (timers.current[it.id]) { clearTimeout(timers.current[it.id]); delete timers.current[it.id]; persist(it.id) } }} />
               <p className={`save-state small ${st === 'error' || st === 'needscore' ? 'err' : ''}`} role="status" aria-live="polite" data-testid={`status-${i + 1}`} style={{ margin: '6px 0 0', minHeight: '1.3em' }}>
                 {st === 'saving' && 'Lagrer …'}
                 {st === 'saved' && 'Lagret ✓'}

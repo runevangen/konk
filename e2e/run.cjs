@@ -28,10 +28,11 @@ const RESULTS = {
     item_id: it.id, position: it.position, label: it.label, avg_score: [7.8, 5.2, 8.4, 4.1, 6.9, 7.8][i], n: 8,
     by_office: [{ office_id: 'of1', name: 'Oslo', avg_score: 7.1, n: 5 }, { office_id: 'of2', name: 'Stavanger', avg_score: 6.2, n: 3 }],
     correct_option_id: 'o2', correct_label: ['Julebrus A', 'Solo', 'Pepsi Jul', 'Mineralvann', 'Julebrus B', 'Julebrus A'][i], hit_rate: [0.5, 0.25, 0.75, 0.38, 0.4, 0.5][i],
+    tags: i === 2 ? { Krydret: 5, Søt: 3, Sur: 1 } : {},
   })),
   comments: [
-    { item_id: 'i3', comment: 'Myk, krydret og skikkelig juletid!', display_name: 'Kari', office_name: 'Oslo', score: 9 },
-    { item_id: 'i3', comment: 'Litt for søt for meg.', display_name: null, office_name: 'Stavanger', score: 7 },
+    { item_id: 'i3', comment: 'Myk, krydret og skikkelig juletid!', featured: true, display_name: 'Kari', office_name: 'Oslo', score: 9 },
+    { item_id: 'i3', comment: 'Litt for søt for meg.', featured: false, display_name: null, office_name: 'Stavanger', score: 7 },
   ],
 }
 
@@ -133,6 +134,12 @@ function makeBackend(state) {
         const hit = Object.entries(state.entries).filter(([, e]) => (idq && e.id === idq) || (!idq && uq && e.user_id === uq) || (!idq && !uq))
         for (const [k, e] of hit) { delete state.entries[k]; state.deletes.push(e.id) }
         return json(hit.map(([, e]) => ({ id: e.id })))
+      }
+      if (req.method() === 'PATCH') {
+        const b = req.postDataJSON(); const idq = eq('id'), itq = eq('item_id'), fq = eq('featured')
+        state.patches = state.patches || []; state.patches.push({ id: idq, item_id: itq, featured: fq, b })
+        for (const e of Object.values(state.entries)) if ((!idq || e.id === idq) && (!itq || e.item_id === itq) && (!fq || String(!!e.featured) === fq)) Object.assign(e, b)
+        return json([])
       }
       if (req.method() === 'POST') { const b = req.postDataJSON(); state.saves.push(b); state.entries[b.item_id] = { id: 'e' + b.item_id, ...b }; return json([], 201) }
       return json(Object.values(state.entries))
@@ -269,10 +276,20 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByText('Lagret ✓').waitFor()
     assert.strictEqual(state.saves.at(-1).score, 8); assert.strictEqual(state.saves.at(-1).guess_option_id, 'o2')
     assert.strictEqual(state.saves.at(-1).user_id, UID)
+    assert.strictEqual(await page.getByLabel('Kommentar (valgfri)').count(), 0, 'kommentarfeltet er lukket til du trenger det')
+    await page.getByTestId('legg-til-kommentar').click()
     await page.getByLabel('Kommentar (valgfri)').fill('Fin og krydret')
     await page.getByText('Lagret ✓').waitFor({ timeout: 4000 })
     await page.waitForTimeout(1200)
     assert.strictEqual(state.saves.at(-1).comment, 'Fin og krydret')
+    // smaksmerker: hurtigvalg som lagres med en gang, flere kan velges, og trykk igjen fjerner
+    await page.getByTestId(/^tag-.*-Krydret$/).click(); await page.getByTestId(/^tag-.*-Søt$/).click()
+    await page.getByText('Lagret ✓').waitFor()
+    for (let k = 0; k < 30 && JSON.stringify(state.saves.at(-1).tags) !== '["Søt","Krydret"]'; k++) await page.waitForTimeout(100)
+    assert.deepStrictEqual(state.saves.at(-1).tags, ['Søt', 'Krydret'])
+    await page.getByTestId(/^tag-.*-Søt$/).click()
+    for (let k = 0; k < 30 && JSON.stringify(state.saves.at(-1).tags) !== '["Krydret"]'; k++) await page.waitForTimeout(100)
+    assert.deepStrictEqual(state.saves.at(-1).tags, ['Krydret'])
     // kommentar + Neste uten å vente: flush
     await page.getByLabel('Kommentar (valgfri)').fill('Endret rett før neste')
     await page.getByRole('button', { name: 'Neste →' }).click()
@@ -284,6 +301,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('button', { name: 'Glass 3', exact: false }).first().click()
     await page.locator('.score-grid input[value=\"9\"]').check()
     await page.getByLabel('Pepsi Jul', { exact: true }).check()
+    await page.getByTestId('legg-til-kommentar').click()
     await page.getByLabel('Kommentar (valgfri)').fill('Skikkelig juletid!')
     await page.getByText('Lagret ✓').waitFor()
     await page.waitForTimeout(1200)
@@ -401,7 +419,15 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.goto(BASE + '/k/julebrustest/resultat')
     await page.getByRole('heading', { name: /Resultat:/ }).waitFor()
     await page.locator('details.rank-item').first().locator('summary').click()
-    await page.getByText('Myk, krydret').waitFor()
+    await page.getByText('Myk, krydret').first().waitFor()
+    // dagens sitat løftes frem og står ikke to ganger; smaksprofilen viser de vanligste merkene
+    assert.strictEqual(await page.getByTestId('dagens-sitat').count(), 1)
+    assert.ok(/Myk, krydret/.test(await page.getByTestId('dagens-sitat').innerText()) && /Dagens sitat/.test(await page.getByTestId('dagens-sitat').innerText()))
+    assert.strictEqual(await page.getByText('Myk, krydret', { exact: false }).count(), 1, 'sitatet står ikke også i kommentarlista')
+    await page.getByText('Litt for søt for meg.').waitFor()
+    const profil = page.getByTestId('smaksprofil')
+    assert.deepStrictEqual(await profil.locator('.taste-row .lbl').allInnerTexts(), ['Krydret', 'Søt', 'Sur'])
+    assert.ok(/5 av 8/.test(await profil.innerText()))
     await page.locator('details.rank-item').first().getByRole('button', { name: 'Digger' }).click()
     await page.waitForFunction(() => document.querySelector('details.rank-item[open] .react[aria-pressed=true]'))
     assert.strictEqual(state.feedback.length, 1); assert.strictEqual(state.feedback[0].target, 'item'); assert.strictEqual(state.feedback[0].item_id, 'i3')
@@ -1115,6 +1141,13 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.strictEqual(state.saves.at(-1).comment, 'Litt for søt')
     await page.getByTestId('status-1').getByText('Lagret ✓').waitFor()
     assert.strictEqual(state.saves.at(-1).score, 7, 'scoren ligger fast når bare kommentaren endres')
+    // smaksmerker lagres med en gang, og kommentarfeltet er lukket når det er tomt
+    assert.strictEqual(await kort.nth(1).getByTestId('legg-til-kommentar').count(), 1)
+    assert.strictEqual(await kort.nth(0).getByTestId('legg-til-kommentar').count(), 0, 'glass med kommentar viser feltet')
+    await kort.nth(0).getByTestId(/^tag-.*-Krydret$/).click()
+    await page.getByTestId('status-1').getByText('Lagret ✓').waitFor()
+    for (let k = 0; k < 30 && JSON.stringify(state.saves.at(-1).tags) !== '["Krydret"]'; k++) await page.waitForTimeout(100)
+    assert.deepStrictEqual(state.saves.at(-1).tags, ['Krydret'])
     // nytt glass: gjetning uten score lagres ikke, score gjør det
     const before = state.saves.length
     await kort.nth(1).getByLabel('Gjetter på').selectOption('o1')
@@ -1201,6 +1234,32 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.strictEqual(await u.page.getByTestId('administrer').count(), 0)
     ok('forsiden: admin skjuler/viser, flytter opp og ned og sletter (med SLETT-bekreftelse); andre ser bare synlige')
     await u.ctx.close()
+  }
+
+  {
+    // --- Admin: «dagens sitat» ett per glass, og skjult kommentar kan ikke være sitat ---
+    const state = freshState({ admin: true, entries: {
+      a1: { id: 'ea1', user_id: UID, item_id: 'i1', score: 8, guess_option_id: null, comment: 'Første kommentar', tags: [], hidden: false, featured: false },
+      a2: { id: 'ea2', user_id: UID, item_id: 'i1', score: 6, guess_option_id: null, comment: 'Andre kommentar', tags: [], hidden: false, featured: true },
+    } })
+    state.profileList = [{ id: UID, display_name: 'Kari Nordmann', office_id: 'of1', anonymous: false, is_admin: true }]
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/admin'); await page.getByRole('tab', { name: 'Moderering' }).click()
+    await page.getByText('Første kommentar').waitFor()
+    assert.strictEqual(await page.getByRole('button', { name: '⭐ Dagens sitat' }).count(), 1)
+    await page.getByRole('button', { name: '☆ Løft frem' }).click()
+    for (let k = 0; k < 40 && !(state.entries.a1.featured && !state.entries.a2.featured); k++) await page.waitForTimeout(100)
+    assert.strictEqual(state.entries.a1.featured, true); assert.strictEqual(state.entries.a2.featured, false, 'bare ett sitat per glass')
+    await page.getByRole('button', { name: '⭐ Dagens sitat' }).waitFor()
+    // skjuler du sitatet, mister det plassen
+    await page.getByRole('button', { name: 'Skjul' }).first().click()
+    for (let k = 0; k < 40 && !state.entries.a1.hidden; k++) await page.waitForTimeout(100)
+    assert.strictEqual(state.entries.a1.hidden, true); assert.strictEqual(state.entries.a1.featured, false)
+    assert.strictEqual(await page.getByRole('button', { name: '☆ Løft frem' }).first().isDisabled(), true, 'skjult kommentar kan ikke løftes frem')
+    ok('admin: dagens sitat ett per glass, og skjult kommentar mister sitatplassen')
+    await ctx.close()
   }
 
   // --- Reduced motion ---

@@ -6,9 +6,10 @@ import type { Competition as Comp, GuessOption, Id, Item } from '../api/types'
 import { useAuth } from '../auth'
 import { ErrorBox, Loading, Progress, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
-import { cleanComment, COMMENT_MAX, isValidScore, SCORE_MAX, SCORE_MIN } from '../lib/validation'
+import { CommentField, TagPicker } from '../components/Taste'
+import { cleanComment, cleanTags, COMMENT_MAX, isValidScore, SCORE_MAX, SCORE_MIN } from '../lib/validation'
 
-interface Draft { score: number | null; guess: Id | null; comment: string }
+interface Draft { score: number | null; guess: Id | null; comment: string; tags: string[] }
 type SaveState = 'idle' | 'saving' | 'saved' | 'needscore' | 'error'
 const SAVE_DELAY = 700
 
@@ -24,7 +25,7 @@ export default function Competition() {
     const [items, options] = await Promise.all([listItems(comp.id), listOptions(comp.id)])
     const entries = await listMyEntries(uid, items.map((i) => i.id))
     const drafts: Record<Id, Draft> = {}
-    for (const e of entries) drafts[e.item_id] = { score: e.score, guess: e.guess_option_id, comment: e.comment ?? '' }
+    for (const e of entries) drafts[e.item_id] = { score: e.score, guess: e.guess_option_id, comment: e.comment ?? '', tags: cleanTags(e.tags) }
     return { comp, items, options, drafts }
   }, [slug, uid])
 
@@ -53,7 +54,7 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
     const d = draftsRef.current[itemId]
     if (!d || !isValidScore(d.score)) { setSaveState((s) => ({ ...s, [itemId]: 'needscore' })); return }
     setSaveState((s) => ({ ...s, [itemId]: 'saving' }))
-    const payload = { user_id: uid, item_id: itemId, score: d.score, guess_option_id: d.guess, comment: cleanComment(d.comment) }
+    const payload = { user_id: uid, item_id: itemId, score: d.score, guess_option_id: d.guess, comment: cleanComment(d.comment), tags: cleanTags(d.tags) }
     chain.current = chain.current.then(async () => {
       try {
         await saveEntry(payload)
@@ -79,7 +80,7 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
 
   function update(itemId: Id, patch: Partial<Draft>, immediate: boolean) {
     if (locked) return
-    const next = { ...(draftsRef.current[itemId] ?? { score: null, guess: null, comment: '' }), ...patch }
+    const next = { ...(draftsRef.current[itemId] ?? { score: null, guess: null, comment: '', tags: [] }), ...patch }
     draftsRef.current = { ...draftsRef.current, [itemId]: next }
     setDrafts(draftsRef.current)
     window.clearTimeout(timers.current[itemId]); delete timers.current[itemId]
@@ -92,7 +93,7 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
 
   if (!item) return <div className="card"><h1>{comp.title}</h1><p>Ingen glass er lagt inn ennå.</p><Link to="/">Til forsiden</Link></div>
 
-  const d = drafts[item.id] ?? { score: null, guess: null, comment: '' }
+  const d = drafts[item.id] ?? { score: null, guess: null, comment: '', tags: [] }
   const done = Object.values(drafts).filter((x) => isValidScore(x.score)).length
   const st = saveState[item.id] ?? 'idle'
   const last = idx === items.length - 1
@@ -152,11 +153,15 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
           </fieldset>
         )}
 
-        <label className="field" htmlFor="comment">Kommentar (valgfri)</label>
-        <textarea id="comment" value={d.comment} maxLength={COMMENT_MAX} disabled={locked} placeholder="Hva smakte du?"
-          onChange={(e) => update(item.id, { comment: e.target.value }, false)} onBlur={() => { if (timers.current[item.id]) flushAll() }} />
-        <div className="row between small soft">
-          <span>{d.comment.length}/{COMMENT_MAX}</span>
+        <fieldset disabled={locked}>
+          <legend>Hvordan smaker det? <span className="soft">(valgfritt)</span></legend>
+          <TagPicker name={item.id} value={d.tags} disabled={locked} onChange={(tags) => update(item.id, { tags }, true)} />
+        </fieldset>
+
+        <CommentField id="comment" value={d.comment} maxLength={COMMENT_MAX} disabled={locked} counter
+          onChange={(v) => update(item.id, { comment: v }, false)} onBlur={() => { if (timers.current[item.id]) flushAll() }} />
+        <div className="row between small soft" style={{ marginTop: 6 }}>
+          <span />
           <span className={`save-state ${st === 'error' ? 'err' : ''}`} role="status" aria-live="polite">
             {st === 'saving' && 'Lagrer …'}
             {st === 'saved' && 'Lagret ✓'}

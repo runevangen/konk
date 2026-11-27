@@ -8,7 +8,7 @@ import { ErrorBox, Loading } from '../components/ui'
 import { useAsync } from '../hooks'
 import { REACTIONS } from '../lib/emoji'
 import { formatPercent, formatScore, pluralize, rankBy, scoreBarWidth } from '../lib/format'
-import { COMMENT_MAX, cleanComment } from '../lib/validation'
+import { COMMENT_MAX, cleanComment, tasteProfile } from '../lib/validation'
 
 export default function Results() {
   const { slug = '' } = useParams()
@@ -170,13 +170,24 @@ function ItemResult({ rank, item, comments, fb, mine, onReact }: {
       <div className="inner">
         <div className="bar red" aria-hidden="true"><i style={{ width: `${scoreBarWidth(item.avg_score)}%` }} /></div>
         <p className="soft small" style={{ marginTop: 6 }}>Glass {item.position}{item.correct_label ? `: fasit ${item.correct_label}` : ''} · {pluralize(item.n, 'vurdering', 'vurderinger')}</p>
+        {comments.filter((c) => c.featured).slice(0, 1).map((c, i) => (
+          <blockquote className="quote" key={`q${i}`} data-testid="dagens-sitat">«{c.comment}»<div className="who">⭐ Dagens sitat · {c.display_name ?? 'Anonym'} · {c.office_name}</div></blockquote>
+        ))}
         {item.by_office.length > 0 && (
           <table className="t" aria-label="Snitt per kontor"><tbody>
             {item.by_office.map((o) => <tr key={o.office_id}><td>{o.name}</td><td><strong>{formatScore(o.avg_score)}</strong></td><td className="soft small">{o.n} vurd.</td></tr>)}
           </tbody></table>
         )}
-        {comments.length > 0 && <h3 style={{ marginTop: 12 }}>Kommentarer</h3>}
-        {comments.map((c, i) => (
+        {tasteProfile(item.tags, item.n).length > 0 && (
+          <div data-testid="smaksprofil" style={{ marginTop: 12 }}>
+            <h3 style={{ margin: '0 0 4px' }}>Smak</h3>
+            {tasteProfile(item.tags, item.n).slice(0, 5).map((t) => (
+              <div className="taste-row" key={t.tag}><span className="lbl">{t.tag}</span><span className="bar" aria-hidden="true"><i style={{ width: `${Math.round(t.share * 100)}%` }} /></span><span className="soft small">{t.count} av {item.n}</span></div>
+            ))}
+          </div>
+        )}
+        {comments.some((c) => !c.featured) && <h3 style={{ marginTop: 12 }}>Kommentarer</h3>}
+        {comments.filter((c) => !c.featured || comments.filter((x) => x.featured).indexOf(c) > 0).map((c, i) => (
           <div className="comment" key={i}>{c.comment}<div className="who">{c.display_name ?? 'Anonym'} · {c.office_name} · ga {c.score}</div></div>
         ))}
         <h3 style={{ marginTop: 12 }}>Din reaksjon</h3>
