@@ -11,7 +11,7 @@ export default function Layout() {
       <Snow />
       <header className="app-header">
         <div className="app-header-inner">
-          <Link to="/" className="brand"><span aria-hidden="true">🎄</span>Konkurranser<span className="dot" aria-hidden="true">.</span></Link>
+          <Link to="/" className="brand"><span aria-hidden="true">🎉</span>Konkurranser</Link>
           {showNav && (
             <nav className="nav" aria-label="Hovedmeny">
               <NavLink to="/" end>Hjem</NavLink>
