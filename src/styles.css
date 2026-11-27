@@ -409,3 +409,4 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .sml-rad.du .sml-spor i { background: var(--green); }
 .sml-rad.du .sml-navn, .sml-rad.du .sml-tall { color: var(--green); }
 .sml-tall { text-align: right; }
+.tag.on .soft { color: inherit; opacity: .85; }

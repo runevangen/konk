@@ -1686,6 +1686,57 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await ctx.close()
   }
 
+  {
+    // --- Admin: nytt quiz-tema (navn, dublettvakt, åpner skjema for første spørsmål, temaet lagres med spørsmålet) ---
+    const state = freshState({ admin: true })
+    state.quiz = { rows: [], ops: [], n: 0 }
+    const Z = state.quiz
+    const { ctx, page } = await newPage(browser, state)
+    page.on('dialog', (d) => { void d.accept() })
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByRole('link', { name: 'Admin' }).click()
+    await page.getByRole('tab', { name: 'Quiz-spørsmål' }).click()
+    await page.getByText('Ingen spørsmål ennå.').waitFor()
+    await page.getByTestId('quiz-temaer').waitFor()
+    // et første tema, så vi har noe å kollidere med
+    await page.getByTestId('nytt-tema').click()
+    await page.getByLabel('Navn på nytt tema').fill('Jul')
+    await page.getByRole('button', { name: 'Opprett og legg til spørsmål' }).click()
+    await page.getByLabel('Spørsmål', { exact: true }).fill('Første spørsmål?')
+    for (const [l, v] of [['A', 'Ja'], ['B', 'Nei'], ['C', 'Kanskje'], ['D', 'Vet ikke']]) await page.getByLabel('Alternativ ' + l, { exact: true }).fill(v)
+    await page.getByLabel('Riktig er alternativ A').check()
+    await page.getByRole('button', { name: 'Lagre', exact: true }).click()
+    await page.getByText('Spørsmålet er lagt til.').waitFor()
+    assert.strictEqual(Z.rows[0].theme, 'Jul')
+    // dublett (andre bokstaver og ekstra mellomrom) avvises
+    await page.getByTestId('nytt-tema').click()
+    await page.getByLabel('Navn på nytt tema').fill('  jUL ')
+    await page.getByRole('button', { name: 'Opprett og legg til spørsmål' }).click()
+    await page.getByText('Det finnes allerede et tema med det navnet.').waitFor()
+    // nytt navn: temaet vises med en gang (0 spørsmål), og skjemaet åpnes med temaet satt
+    await page.getByLabel('Navn på nytt tema').fill('Norsk historie')
+    await page.getByRole('button', { name: 'Opprett og legg til spørsmål' }).click()
+    await page.getByTestId('tema-Norsk historie').waitFor()
+    assert.ok(/\(0\)/.test(await page.getByTestId('tema-Norsk historie').innerText()), 'nytt tema står i lista uten spørsmål')
+    assert.strictEqual(await page.getByLabel('Tema', { exact: true }).inputValue(), 'Norsk historie', 'skjemaet har temaet satt')
+    await page.getByLabel('Spørsmål', { exact: true }).fill('Når ble Norge selvstendig?')
+    for (const [l, v] of [['A', '1814'], ['B', '1905'], ['C', '1945'], ['D', '1814 og 1905']]) await page.getByLabel('Alternativ ' + l, { exact: true }).fill(v)
+    await page.getByLabel('Riktig er alternativ B').check()
+    await page.getByRole('button', { name: 'Lagre', exact: true }).click()
+    await page.getByText('Spørsmålet er lagt til.').waitFor()
+    assert.deepStrictEqual(Z.rows.map((r) => r.theme), ['Jul', 'Norsk historie'])
+    assert.ok(/\(1\)/.test(await page.getByTestId('tema-Norsk historie').innerText()), 'telleren følger med')
+    await shot(page, '49-quiz-nytt-tema')
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 1, 'det nye temaet er valgt som filter')
+    await page.getByTestId('tema-Norsk historie').click()                    // trykk igjen: alle temaer
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 2)
+    await page.getByTestId('tema-Jul').click()
+    assert.strictEqual(await page.locator('[data-testid="quiz-rad"]').count(), 1)
+    ok('admin: nytt quiz-tema med navn, dublettvakt og første spørsmål')
+    await ctx.close()
+  }
+
   // --- Reduced motion ---
   {
     const state = freshState()

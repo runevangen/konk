@@ -225,3 +225,14 @@ export function toExportJson(rows: (QuizQuestionInput & { hidden?: boolean })[])
     kilde_nivaa: q.sourceLevel, status: q.reviewStatus === 'ok' ? 'OK' : q.reviewStatus === 'usikker' ? 'Usikker' : '', merknad: q.reviewNote ?? '',
   })), null, 2)
 }
+
+/** Navn på nytt tema: 1–40 tegn, og ikke et som finnes (store/små bokstaver og ekstra mellomrom teller ikke). */
+export function validateThemeName(name: string, existing: readonly string[]): string | null {
+  const t = name.replace(/\s+/g, ' ').trim()
+  if (!t) return 'Skriv et navn på temaet.'
+  if (t.length > LIMITS.theme) return `Navnet kan ha maks ${LIMITS.theme} tegn.`
+  const key = (x: string) => x.replace(/\s+/g, ' ').trim().toLowerCase()
+  if (existing.some((e) => key(e) === key(t))) return 'Det finnes allerede et tema med det navnet.'
+  return null
+}
+export const cleanThemeName = (name: string) => name.replace(/\s+/g, ' ').trim()
