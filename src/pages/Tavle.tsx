@@ -75,7 +75,7 @@ export default function Tavle() {
   const ranked = useMemo(() => (board ? rankBy(rowsFor(board, view), (r) => metric(r, mode)) : []), [board, view, mode])
 
   if (comp === undefined) return <Loading />
-  if (comp === null) return <div className="card"><h1>Fant ikke konkurransen</h1><Link to="/">Til forsiden</Link></div>
+  if (comp === null) return <div className="card"><h1>Fant ikke konkurransen</h1><p>Trenger du en kode? Skriv den inn i feltet «Har du en kode?» på forsiden.</p><Link to="/">Til forsiden</Link></div>
   if (error instanceof ApiError && error.code === 'live_off') {
     return (
       <div className="card">

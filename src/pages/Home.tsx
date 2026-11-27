@@ -48,7 +48,7 @@ export default function Home() {
   const toggleVisible = (id: string, visible: boolean) => {
     if (!data) return
     setData(data.map((r) => (r.c.id === id ? { ...r, c: { ...r.c, visible } } : r)))
-    void run(() => setCompetitionVisible(id, visible), visible ? 'Konkurransen er synlig for alle.' : 'Konkurransen er nå skjult fra forsiden. Den er bare tilgjengelig med kode.')
+    void run(() => setCompetitionVisible(id, visible), visible ? 'Konkurransen er åpen for alle innloggede, uten kode.' : 'Konkurransen krever kode. Den er skjult fra forsiden for dem som ikke har brukt koden.')
   }
   const remove = (id: string, title: string) => {
     void run(async () => { await deleteCompetition(id); setData((data ?? []).filter((r) => r.c.id !== id)); setConfirmId(null); setTyped('') }, `«${title}» er slettet.`)
@@ -92,22 +92,22 @@ export default function Home() {
       {msg && <p role={msg.ok ? 'status' : 'alert'} className={msg.ok ? 'muted-on-bg' : 'on-bg-error'} data-testid="forside-melding" style={{ fontWeight: 700 }}>{msg.text}</p>}
       {loading && <Loading />}
       {error != null && <ErrorBox error={error} />}
-      {data && data.length === 0 && <div className="card"><p>Ingen konkurranser er åpnet ennå. Kom tilbake snart.</p></div>}
+      {data && data.length === 0 && <div className="card" data-testid="ingen-konkurranser"><p><strong>Skriv inn koden du har fått</strong> i feltet over for å bli med i en konkurranse.</p></div>}
       {data?.map(({ c, done, total }, idx) => (
         <div key={c.id} className={`card ${c.visible ? '' : 'dim'}`} data-testid="konkurranse-kort">
-          {isAdmin && !c.visible && <p className="badge" style={{ marginTop: 0 }} data-testid="usynlig-merke">Bare med kode</p>}
+          {isAdmin && !c.visible && <p className="badge" style={{ marginTop: 0 }} data-testid="usynlig-merke">Krever kode</p>}
           {isAdmin && manage && (
             <div className="manage-bar" role="group" aria-label={`Administrer ${c.title}`}>
               <button className="btn ghost small" onClick={() => move(c.id, -1)} disabled={idx === 0} aria-label={`Flytt ${c.title} opp`}>▲</button>
               <button className="btn ghost small" onClick={() => move(c.id, 1)} disabled={idx === data.length - 1} aria-label={`Flytt ${c.title} ned`}>▼</button>
               <Link className="btn ghost small" to={`/k/${c.slug}/skjerm`} target="_blank" rel="noreferrer" data-testid="storskjerm-lenke">📺 Storskjerm</Link>
-              <button className="btn ghost small" onClick={() => toggleVisible(c.id, !c.visible)} aria-pressed={c.visible}>{c.visible ? '👁 Synlig' : '🔑 Bare med kode'}</button>
+              <button className="btn ghost small" onClick={() => toggleVisible(c.id, !c.visible)} aria-pressed={c.visible}>{c.visible ? '👁 Åpen for alle' : '🔑 Krever kode'}</button>
               <button className="btn ghost small danger" onClick={() => { setConfirmId(confirmId === c.id ? null : c.id); setTyped('') }}>🗑 Slett</button>
             </div>
           )}
           {isAdmin && manage && confirmId === c.id && (
             <div className="confirm-box" role="alertdialog" aria-label={`Slett ${c.title}`}>
-              <p style={{ margin: '0 0 8px' }}><strong>Slette «{c.title}» for alltid?</strong> Alle glass, fasit, svar og kommentarer forsvinner, og det kan ikke angres. Vil du bare skjule den fra forsiden, velg «Bare med kode».</p>
+              <p style={{ margin: '0 0 8px' }}><strong>Slette «{c.title}» for alltid?</strong> Alle glass, fasit, svar og kommentarer forsvinner, og det kan ikke angres. Vil du bare skjule den fra forsiden, velg «Krever kode».</p>
               <label className="field" htmlFor={`slett-${c.id}`}>Skriv SLETT for å bekrefte</label>
               <input id={`slett-${c.id}`} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoCapitalize="characters" />
               <div className="row" style={{ gap: 8, marginTop: 10 }}>
