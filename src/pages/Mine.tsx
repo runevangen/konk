@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getCompetition, getResults, listItems, listMyEntries, listOptions, saveEntry } from '../api/data'
+import { getCompetition, getMyStanding, getResults, listItems, listMyEntries, listOptions, saveEntry } from '../api/data'
 import { errorMessage } from '../api/functions'
 import { useAuth } from '../auth'
 import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
 import { CommentField, TagPicker } from '../components/Taste'
-import { glassList, guessResult, usedGuesses } from '../lib/guesses'
+import { glassList, guessResult, standingTekst, usedGuesses } from '../lib/guesses'
 import { cleanComment, cleanTags, COMMENT_MAX, isValidScore, SCORE_MAX, SCORE_MIN } from '../lib/validation'
 
 interface Draft { score: number | null; guess: string | null; comment: string; tags: string[] }
@@ -28,7 +28,8 @@ export default function Mine() {
     const entries = await listMyEntries(uid, items.map((i) => i.id))
     // Avsluttet: hent fasit, så du ser hva som var riktig og hvor mange du fikk.
     const results = comp.status === 'closed' ? await getResults(comp.id).catch(() => null) : null
-    return { comp, items, options, entries, results }
+    const standing = comp.status === 'closed' ? await getMyStanding(comp.id).catch(() => null) : null
+    return { comp, items, options, entries, results, standing }
   }, [slug, uid])
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
@@ -118,6 +119,30 @@ export default function Mine() {
             {fasit.withFasit - fasit.guessed > 0 ? `Du svarte «vet ikke» eller lot være på ${fasit.withFasit - fasit.guessed}. ` : ''}
             Under ser du fasit for hvert glass.
           </p>
+          {data.standing && data.standing.my_hits != null && (() => {
+            const st = data.standing!
+            const tot = Math.max(1, st.total, st.best ?? 0)
+            const bar = (label: string, v: number | null, you = false, key = label) => v == null ? null : (
+              <div key={key} className={`sml-rad ${you ? 'du' : ''}`} data-testid={`sml-${key}`}>
+                <span className="sml-navn">{label}</span>
+                <span className="sml-spor" aria-hidden="true"><i style={{ width: `${Math.round((v / tot) * 100)}%` }} /></span>
+                <strong className="sml-tall">{String(v).replace('.', ',')}</strong>
+              </div>
+            )
+            return (
+              <div className="sammenligning" data-testid="mine-sammenligning">
+                <p style={{ margin: '12px 0 6px', fontWeight: 700 }} data-testid="sml-plass">{standingTekst(st.rank, st.tied, st.n)}</p>
+                {st.best != null ? (
+                  <>
+                    {bar('Beste', st.best)}
+                    {bar('Snitt', st.avg)}
+                    {bar('Du', st.my_hits, true)}
+                    {bar('Dårligste', st.worst)}
+                  </>
+                ) : <p className="soft small" style={{ margin: 0 }}>Sammenligningen vises når minst tre har deltatt.</p>}
+              </div>
+            )
+          })()}
         </div>
       )}
 

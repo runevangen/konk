@@ -401,3 +401,11 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .skjerm-kode-skjult { background: rgba(0,0,0,.25); border-radius: 14px; padding: 18px 22px; text-align: center; }
 .badge.bad { background: var(--red); color: #fff; }
 .badge.ok { background: var(--green); color: var(--on-green, #fff); }
+.sammenligning { margin-top: 6px; }
+.sml-rad { display: grid; grid-template-columns: 5.2em 1fr 2.6em; gap: 10px; align-items: center; margin: 5px 0; }
+.sml-navn { font-weight: 600; }
+.sml-spor { height: 14px; background: #e6dfc9; border-radius: 999px; overflow: hidden; }
+.sml-spor i { display: block; height: 100%; background: #9aa79f; }
+.sml-rad.du .sml-spor i { background: var(--green); }
+.sml-rad.du .sml-navn, .sml-rad.du .sml-tall { color: var(--green); }
+.sml-tall { text-align: right; }

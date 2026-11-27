@@ -39,3 +39,10 @@ export function guessResult(itemIds: readonly string[], guessOf: (itemId: string
   const withFasit = rows.filter((r) => r.status !== 'ukjent').length
   return { rows, hits, guessed, withFasit }
 }
+
+/** «Du ble nr. 3 av 7», med «delt med 2 andre» når flere fikk like mange. */
+export function standingTekst(rank: number | null, tied: number | null, n: number): string {
+  if (rank == null || !n) return ''
+  const delt = tied && tied > 1 ? `, delt med ${tied - 1} ${tied - 1 === 1 ? 'annen' : 'andre'}` : ''
+  return `Du ble nr. ${rank} av ${n}${delt}`
+}

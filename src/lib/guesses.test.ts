@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { glassList, guessResult, usedGuesses } from './guesses'
+import { glassList, guessResult, standingTekst, usedGuesses } from './guesses'
 
 const g: Record<string, string | null> = { a: 'x', b: 'y', c: 'x', d: null, e: 'x' }
 
@@ -33,5 +33,14 @@ describe('guessResult', () => {
   it('uten noen svar er alt «ingen», og uten fasit er alt «ukjent»', () => {
     expect(guessResult(['a'], () => null, { a: 'x' }).rows[0].status).toBe('ingen')
     expect(guessResult(['a'], () => 'x', {}).rows[0].status).toBe('ukjent')
+  })
+})
+
+describe('standingTekst', () => {
+  it('sier plassen, og delt når flere fikk like mange', () => {
+    expect(standingTekst(3, 1, 7)).toBe('Du ble nr. 3 av 7')
+    expect(standingTekst(3, 3, 7)).toBe('Du ble nr. 3 av 7, delt med 2 andre')
+    expect(standingTekst(1, 2, 5)).toBe('Du ble nr. 1 av 5, delt med 1 annen')
+    expect(standingTekst(null, null, 7)).toBe('')
   })
 })
