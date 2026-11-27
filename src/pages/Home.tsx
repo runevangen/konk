@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { isCode, normalizeCode } from '../lib/quiz'
-import { countItems, deleteCompetition, regenCompetitionCode, setCompetitionCode, listCompetitions, myProgress, saveCompetitionOrder, setCompetitionVisible } from '../api/data'
+import { countItems, deleteCompetition, getQuizOnHome, setQuizOnHome, regenCompetitionCode, setCompetitionCode, listCompetitions, myProgress, saveCompetitionOrder, setCompetitionVisible } from '../api/data'
 import { errorMessage } from '../api/functions'
 import { moveInOrder } from '../lib/competitionOrder'
 import type { Competition } from '../api/types'
@@ -23,6 +23,8 @@ export default function Home() {
   const { profile } = useAuth()
   const { data, error, loading, reload, setData } = useAsync(load, [])
   const isAdmin = !!profile?.is_admin
+  const quizOn = useAsync(getQuizOnHome, [])
+  const showQuiz = quizOn.data ?? quizOn.error != null   // ikke vis (og skjul så) mens vi venter; feiler oppslaget, vises den
   const nav = useNavigate()
   const [kode, setKode] = useState('')
   const goKode = (e: FormEvent) => { e.preventDefault(); if (isCode(kode)) nav(`/kode/${kode}`) }
@@ -81,14 +83,25 @@ export default function Home() {
         </div>
         <p className="soft small" style={{ margin: '6px 0 0' }}>Koden står på skjermen. Den gir deg en konkurranse eller en quiz.</p>
       </form>
-      <div className="card">
-        <h2>🎯 Quiz</h2>
-        <p className="soft">Party-quiz med romkode: svar raskt og riktig mot kollegene.</p>
-        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <Link className="btn gold" to="/quiz">Bli med i quiz</Link>
-          {profile?.is_admin && <Link className="btn ghost" to="/quiz/ny">Lag quiz-rom</Link>}
+      {(showQuiz || isAdmin) && (
+        <div className={`card ${quizOn.data === false ? 'dim' : ''}`} data-testid="quiz-kort">
+          {isAdmin && quizOn.data === false && <p className="badge" style={{ marginTop: 0 }} data-testid="quiz-skjult-merke">Skjult for andre</p>}
+          <h2>🎯 Quiz</h2>
+          <p className="soft">Party-quiz med romkode: svar raskt og riktig mot kollegene.</p>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <Link className="btn gold" to="/quiz">Bli med i quiz</Link>
+            {profile?.is_admin && <Link className="btn ghost" to="/quiz/ny">Lag quiz-rom</Link>}
+          </div>
+          {isAdmin && (
+            <div className="admin-rad" style={{ margin: '12px 0 0', paddingBottom: 0, borderBottom: 0 }}>
+              <button className="btn ghost small" aria-pressed={quizOn.data !== false} data-testid="quiz-bryter"
+                onClick={() => { const next = quizOn.data === false; quizOn.setData(next); void run(() => setQuizOnHome(next), next ? 'Quiz vises på forsiden for alle.' : 'Quiz er skjult fra forsiden. Den virker fortsatt med kode.') .then(() => quizOn.reload()) }}>
+                {quizOn.data === false ? '🚫 Skjult på forsiden' : '👁 Vises på forsiden'}
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      )}
       <div className="row between" style={{ margin: '0 0 8px' }}>
         <p className="muted-on-bg" style={{ margin: 0 }}>Velg en konkurranse.</p>
         {isAdmin && <button className={`btn small ${manage ? 'gold' : 'ghost'}`} onClick={() => { setManage((m) => !m); setConfirmId(null); setTyped(''); setMsg(null) }} aria-pressed={manage} data-testid="administrer">{manage ? 'Ferdig' : '⚙️ Administrer'}</button>}

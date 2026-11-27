@@ -72,6 +72,10 @@ function makeBackend(state) {
       if (state.profileList && !q.get('id')) return json(state.profileList)
       return single([{ id: UID, display_name: 'Kari Nordmann', office_id: 'of1', anonymous: false, is_admin: !!state.admin }])
     }
+    if (p.endsWith('/rest/v1/konk_settings')) {
+      if (req.method() === 'POST' || req.method() === 'PATCH') { const b = req.postDataJSON(); if (b.key === 'quiz_on_home') state.quizOn = b.value; state.settingsWrites = (state.settingsWrites || 0) + 1; return json([], 201) }
+      return single([{ value: state.quizOn !== false }])
+    }
     if (p.endsWith('/rpc/konk_join_by_code')) {
       const b = req.postDataJSON(); const list = state.comps || [{ ...COMP, status: state.status }]
       const c = list.find((x) => x.code === String(b.p_code).toUpperCase() && (state.admin || x.status !== 'draft'))
@@ -1412,6 +1416,39 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor()
     ok('glass for glass: nytt kortutseende, starter på første ubesvarte, ren tittel')
     await ctx.close()
+  }
+
+  {
+    // --- Admin styrer om quiz-kortet vises på forsiden ---
+    const state = freshState({ admin: true })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByTestId('quiz-kort').waitFor()
+    assert.ok(/Vises på forsiden/.test(await page.getByTestId('quiz-bryter').innerText()))
+    await page.getByTestId('quiz-bryter').click()
+    await page.getByText('Quiz er skjult fra forsiden. Den virker fortsatt med kode.').waitFor()
+    assert.strictEqual(state.quizOn, false)
+    assert.strictEqual(await page.getByTestId('quiz-skjult-merke').count(), 1, 'admin ser kortet dimmet med merke')
+    await page.reload(); await page.getByTestId('quiz-skjult-merke').waitFor()
+    await ctx.close()
+    // vanlig bruker: ingen quiz-kort, men kodefeltet virker fortsatt
+    const st2 = freshState({ admin: false }); st2.quizOn = false
+    const u = await newPage(browser, st2)
+    await u.page.goto(BASE + '/login'); await u.page.locator('#name').fill('Kari'); await u.page.locator('#pin').fill('123456'); await u.page.getByRole('button', { name: 'Logg inn' }).click()
+    await u.page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await u.page.getByTestId('kodefelt').waitFor()
+    await u.page.waitForTimeout(500)
+    assert.strictEqual(await u.page.getByTestId('quiz-kort').count(), 0, 'skjult for vanlige brukere')
+    assert.strictEqual(await u.page.getByRole('link', { name: 'Bli med i quiz' }).count(), 0)
+    // slått på igjen: kortet vises
+    const st3 = freshState({ admin: false }); st3.quizOn = true
+    const v = await newPage(browser, st3)
+    await v.page.goto(BASE + '/login'); await v.page.locator('#name').fill('Kari'); await v.page.locator('#pin').fill('123456'); await v.page.getByRole('button', { name: 'Logg inn' }).click()
+    await v.page.getByTestId('quiz-kort').waitFor()
+    assert.strictEqual(await v.page.getByTestId('quiz-bryter').count(), 0, 'bryteren er bare for admin')
+    ok('forsiden: admin skjuler/viser quiz-kortet; vanlige brukere ser det bare når det er på')
+    await u.ctx.close(); await v.ctx.close()
   }
 
   // --- Reduced motion ---
