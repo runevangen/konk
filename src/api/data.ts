@@ -46,10 +46,10 @@ export async function listOptions(competitionId: Id) {
 export async function listMyEntries(userId: Id, itemIds: Id[]) {
   if (!itemIds.length) return [] as Entry[]
   return check(
-    await supabase.from('konk_entries').select('id,user_id,item_id,score,guess_option_id,comment').eq('user_id', userId).in('item_id', itemIds),
+    await supabase.from('konk_entries').select('id,user_id,item_id,score,guess_option_id,comment,tags').eq('user_id', userId).in('item_id', itemIds),
   ) as Entry[]
 }
-export async function saveEntry(e: { user_id: Id; item_id: Id; score: number; guess_option_id: Id | null; comment: string | null }) {
+export async function saveEntry(e: { user_id: Id; item_id: Id; score: number; guess_option_id: Id | null; comment: string | null; tags: string[] }) {
   check(await supabase.from('konk_entries').upsert(e, { onConflict: 'user_id,item_id' }))
 }
 export async function myProgress(competitionId: Id) {
@@ -133,15 +133,20 @@ export async function listProfiles() {
     await supabase.from('konk_profiles').select('id,display_name,office_id,anonymous,is_admin').order('display_name'),
   ) as Profile[]
 }
-export interface ModEntry { id: Id; item_id: Id; user_id: Id; score: number; comment: string | null; hidden: boolean }
+export interface ModEntry { id: Id; item_id: Id; user_id: Id; score: number; comment: string | null; hidden: boolean; featured: boolean }
 export async function listCommentEntries(itemIds: Id[]) {
   if (!itemIds.length) return [] as ModEntry[]
   return check(
-    await supabase.from('konk_entries').select('id,item_id,user_id,score,comment,hidden').in('item_id', itemIds).not('comment', 'is', null).neq('comment', ''),
+    await supabase.from('konk_entries').select('id,item_id,user_id,score,comment,hidden,featured').in('item_id', itemIds).not('comment', 'is', null).neq('comment', ''),
   ) as ModEntry[]
 }
 export async function setEntryHidden(id: Id, hidden: boolean) {
   check(await supabase.from('konk_entries').update({ hidden }).eq('id', id))
+}
+/** «Dagens sitat»: ett per glass. Fjerner alle andre på samme glass først, så det aldri er to. */
+export async function setEntryFeatured(itemId: Id, entryId: Id, featured: boolean) {
+  check(await supabase.from('konk_entries').update({ featured: false }).eq('item_id', itemId).eq('featured', true))
+  if (featured) check(await supabase.from('konk_entries').update({ featured: true }).eq('id', entryId))
 }
 export interface ModFeedback {
   id: Id; user_id: Id; item_id: Id | null; target: FeedbackTarget; emoji: string | null; comment: string | null; hidden: boolean

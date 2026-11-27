@@ -12,6 +12,7 @@ export interface Entry {
   score: number
   guess_option_id: Id | null
   comment: string | null
+  tags?: string[]
   hidden?: boolean
 }
 export interface Profile { id: Id; display_name: string; office_id: Id | null; anonymous: boolean; is_admin: boolean }
@@ -34,8 +35,9 @@ export interface ResultsItem {
   item_id: Id; position: number; label: string; avg_score: number | null; n: number
   by_office: ResultsItemOffice[]
   correct_option_id: Id | null; correct_label: string | null; hit_rate: number | null
+  tags: Record<string, number>
 }
-export interface ResultsComment { item_id: Id; comment: string; display_name: string | null; office_name: string; score: number }
+export interface ResultsComment { item_id: Id; comment: string; featured: boolean; display_name: string | null; office_name: string; score: number }
 export interface Results { overall: ResultsOverall; offices: ResultsOffice[]; items: ResultsItem[]; comments: ResultsComment[] }
 
 export type FeedbackTarget = 'item' | 'result'

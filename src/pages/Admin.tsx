@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   addOption, deleteAllAnswers, deleteEntry, deleteUserAnswers, listCompetitionEntries, deleteOption, listAllFeedback, listCommentEntries, listCompetitions, listItems, listOffices,
-  listOptions, listProfiles, saveCompetition, setEntryHidden, setFeedbackHidden,
+  listOptions, listProfiles, saveCompetition, setEntryFeatured, setEntryHidden, setFeedbackHidden,
 } from '../api/data'
 import { adminDeleteUser, adminResetPin, adminSetPin, errorMessage } from '../api/functions'
 import { useAuth } from '../auth'
@@ -266,7 +266,11 @@ function ModerationTab({ comp }: { comp: Competition }) {
             <div className={e.hidden ? 'hidden-row' : ''} style={{ flex: 1, minWidth: 0 }}>
               {e.comment}<div className="soft small">{label(e.item_id)} · {names[e.user_id] ?? 'ukjent'} · score {e.score}</div>
             </div>
-            <button className="btn ghost small" onClick={() => run(async () => { await setEntryHidden(e.id, !e.hidden); await d.reload() })}>{e.hidden ? 'Vis' : 'Skjul'}</button>
+            <div className="row" style={{ gap: 6, flexShrink: 0 }}>
+              <button className={`btn small ${e.featured ? 'gold' : 'ghost'}`} aria-pressed={e.featured} disabled={e.hidden} title="Dagens sitat for dette glasset"
+                onClick={() => run(async () => { await setEntryFeatured(e.item_id, e.id, !e.featured); await d.reload() })}>{e.featured ? '⭐ Dagens sitat' : '☆ Løft frem'}</button>
+              <button className="btn ghost small" onClick={() => run(async () => { if (!e.hidden && e.featured) await setEntryFeatured(e.item_id, e.id, false); await setEntryHidden(e.id, !e.hidden); await d.reload() })}>{e.hidden ? 'Vis' : 'Skjul'}</button>
+            </div>
           </div>
         ))}
       </div>
