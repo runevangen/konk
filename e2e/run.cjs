@@ -15,7 +15,7 @@ const jwt = (admin) => `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: UID, r
 const user = { id: UID, aud: 'authenticated', role: 'authenticated', email: 'x@konk.invalid', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }
 const session = () => ({ access_token: jwt(), refresh_token: 'r', expires_in: 3600, expires_at: 4102444800, token_type: 'bearer', user })
 
-const COMP = { id: 'c1', slug: 'julebrustest', title: 'Julebrustesten 2026', kind: 'brus', status: 'open', live_board: true, live_board_names: false, visible: true, sort_order: 10 }
+const COMP = { id: 'c1', slug: 'julebrustest', title: 'Julebrustesten 2026', kind: 'brus', status: 'open', live_board: true, live_board_names: false, visible: true, sort_order: 10, code: 'PMEC' }
 const ITEMS = ['Glass 1', 'Glass 2', 'Glass 3', 'Glass 4', 'Glass 5', 'Glass 6'].map((l, i) => ({ id: `i${i + 1}`, competition_id: 'c1', position: i + 1, label: l, image_path: null }))
 const OPTIONS = ['Mineralvann', 'Julebrus A', 'Julebrus B', 'Solo', 'Pepsi Jul'].map((l, i) => ({ id: `o${i + 1}`, competition_id: 'c1', label: l }))
 const RESULTS = {
@@ -72,6 +72,12 @@ function makeBackend(state) {
       if (state.profileList && !q.get('id')) return json(state.profileList)
       return single([{ id: UID, display_name: 'Kari Nordmann', office_id: 'of1', anonymous: false, is_admin: !!state.admin }])
     }
+    if (p.endsWith('/rpc/konk_competition_by_code')) {
+      const b = req.postDataJSON(); const list = state.comps || [{ ...COMP, status: state.status }]
+      const c = list.find((x) => x.code === String(b.p_code).toUpperCase() && (state.admin || (x.visible && x.status !== 'draft')))
+      return json(c ? { slug: c.slug, title: c.title, status: c.status } : null)
+    }
+    if (p.endsWith('/rpc/konk_regen_comp_code')) { const b = req.postDataJSON(); const c = (state.comps || []).find((x) => x.id === b.p_id); c.code = 'NYTT'; return json('NYTT') }
     if (state.comps && p.endsWith('/rest/v1/konk_competitions')) {
       const m = req.method()
       state.compCalls = state.compCalls || []
@@ -1180,9 +1186,9 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
   {
     // --- Forsiden: admin kan skjule/vise, flytte opp og ned og slette konkurranser ---
     const mkComps = () => [
-      { ...COMP, id: 'c1', slug: 'a', title: 'Konkurranse A', visible: true, sort_order: 10 },
-      { ...COMP, id: 'c2', slug: 'b', title: 'Konkurranse B', status: 'closed', visible: true, sort_order: 20 },
-      { ...COMP, id: 'c3', slug: 'c', title: 'Konkurranse C', visible: false, sort_order: 30 },
+      { ...COMP, id: 'c1', slug: 'a', title: 'Konkurranse A', visible: true, sort_order: 10, code: 'AAAA' },
+      { ...COMP, id: 'c2', slug: 'b', title: 'Konkurranse B', status: 'closed', visible: true, sort_order: 20, code: 'BBBB' },
+      { ...COMP, id: 'c3', slug: 'c', title: 'Konkurranse C', visible: false, sort_order: 30, code: 'CCCC' },
     ]
     const titles = (page) => page.locator('[data-testid="konkurranse-kort"] h2').allInnerTexts()
     const state = freshState({ admin: true }); state.comps = mkComps()
@@ -1264,6 +1270,39 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.strictEqual(await page.getByRole('button', { name: '☆ Løft frem' }).first().isDisabled(), true, 'skjult kommentar kan ikke løftes frem')
     ok('admin: dagens sitat ett per glass, og skjult kommentar mister sitatplassen')
     await ctx.close()
+  }
+
+  {
+    // --- Romkode: skrive koden, QR-lenke (også utlogget), ugyldig kode, og admin ser/lager kode ---
+    const state = freshState({ status: 'open' }); state.qz = { calls: [], answers: [], state: { error: 'not_found' } }
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/kode/PMEC')   // utlogget: via innlogging og rett til konkurransen
+    await page.waitForURL('**/login')
+    await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor({ timeout: 8000 })
+    assert.strictEqual(new URL(page.url()).pathname, '/k/julebrustest')
+    await page.goto(BASE + '/')
+    await page.getByTestId('kodefelt').fill('pm')
+    assert.strictEqual(await page.getByRole('button', { name: 'Gå', exact: true }).isDisabled(), true, 'bare fire bokstaver gir Gå')
+    await page.getByTestId('kodefelt').fill('pmec'); assert.strictEqual(await page.getByTestId('kodefelt').inputValue(), 'PMEC')
+    await page.getByRole('button', { name: 'Gå', exact: true }).click()
+    await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor({ timeout: 8000 })
+    await page.goto(BASE + '/kode/ZZZZ')
+    await page.getByText('Fant ingen konkurranse eller quiz med den koden.').waitFor({ timeout: 8000 })
+    ok('romkode: QR-lenke og skrevet kode fører rett til konkurransen, ugyldig kode gir beskjed')
+    await ctx.close()
+    const st2 = freshState({ admin: true }); st2.comps = [{ ...COMP, id: 'c1', slug: 'a', title: 'Konkurranse A', visible: true, sort_order: 10, code: 'AAAA' }]
+    const a = await newPage(browser, st2)
+    await a.page.goto(BASE + '/login'); await a.page.locator('#name').fill('Kari'); await a.page.locator('#pin').fill('123456'); await a.page.getByRole('button', { name: 'Logg inn' }).click()
+    await a.page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await a.page.getByTestId('administrer').click()
+    assert.ok(/AAAA/.test(await a.page.getByTestId('romkode').innerText()))
+    a.page.once('dialog', (d) => d.accept())
+    await a.page.getByRole('button', { name: 'Ny kode' }).click()
+    await a.page.getByText('Ny kode er laget.').waitFor()
+    assert.ok(/NYTT/.test(await a.page.getByTestId('romkode').innerText()))
+    ok('romkode: admin ser koden og kan lage en ny')
+    await a.ctx.close()
   }
 
   // --- Reduced motion ---
