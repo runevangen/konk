@@ -1,3 +1,4 @@
+import { KodeRad } from '../components/KodeRad'
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   addOption, deleteAllAnswers, deleteEntry, deleteUserAnswers, listCompetitionEntries, deleteOption, listAllFeedback, listCommentEntries, listCompetitions, listItems, listOffices,
@@ -74,6 +75,7 @@ function CompetitionsTab({ comps, reload, onReset }: { comps: Competition[]; rel
           <div className="row between"><strong>{c.title}</strong><StatusBadge status={c.status} /></div>
           <p className="soft small">/{c.slug} · {c.kind}{c.live_board ? ' · live tavle på' : ''}</p>
           {c.live_board && c.status !== 'draft' && <p className="small"><a href={`/k/${c.slug}/tavle`}>Åpne live tavle →</a></p>}
+          <KodeRad comp={c} onChanged={() => void reload()} />
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             <button className="btn ghost small" onClick={() => setEditing(c)}>Rediger</button>
             <button className="btn ghost small" onClick={() => onReset(c.id)}>Nullstill svar …</button>

@@ -1329,7 +1329,12 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     const a = await newPage(browser, st2)
     await a.page.goto(BASE + '/login'); await a.page.locator('#name').fill('Kari'); await a.page.locator('#pin').fill('123456'); await a.page.getByRole('button', { name: 'Logg inn' }).click()
     await a.page.getByRole('heading', { name: /God jul/ }).waitFor()
-    // kode og storskjerm ligger rett på kortet, uten å trykke Administrer først
+    await a.page.getByText('Konkurranse A').waitFor()
+    assert.strictEqual(await a.page.getByTestId('romkode').count(), 0, 'koden står ikke på forsiden')
+    assert.strictEqual(await a.page.getByText('AAAA').count(), 0)
+    // koden bor under Admin → Konkurranser
+    await a.page.goto(BASE + '/admin')
+    await a.page.getByText('/a ·').waitFor()
     assert.ok(/AAAA/.test(await a.page.getByTestId('romkode').first().innerText()))
     assert.strictEqual(await a.page.getByTestId('storskjerm-lenke').first().getAttribute('href'), '/k/a/skjerm')
     assert.strictEqual(await a.page.getByTestId('storskjerm-lenke').first().getAttribute('target'), '_blank')
@@ -1351,7 +1356,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await a.page.getByRole('button', { name: '🎲 Tilfeldig' }).click()
     await a.page.getByText('Ny kode: NYTT.').waitFor()
     assert.ok(/NYTT/.test(await a.page.getByTestId('romkode').first().innerText()))
-    ok('romkode: admin ser koden og Storskjerm på kortet, velger egen kode eller tilfeldig')
+    ok('romkode: koden står under Admin → Konkurranser (ikke på forsiden), og admin velger egen kode eller tilfeldig')
     await a.ctx.close()
   }
 
@@ -1550,6 +1555,32 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
       await ctx.close()
     }
     ok('storskjerm: trykk på glass gir panel med fordeling, gjetninger, smak og kommentarer; skjult til admin viser; piltast og Esc')
+  }
+
+  {
+    // --- Storskjerm: koden og QR skjules etter 10 minutter, og admin kan vise dem igjen ---
+    const state = freshState({ admin: true, status: 'open' })
+    const { ctx, page } = await newPage(browser, state, { viewport: { width: 1280, height: 720 }, isMobile: false, hasTouch: false })
+    await page.clock.install()
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/k/julebrustest/skjerm')
+    await page.getByTestId('skjerm-kode').waitFor()
+    assert.ok(/skjules om 10 min/.test(await page.getByTestId('skjerm-kode-tid').innerText()))
+    await page.clock.fastForward('09:00')
+    await page.waitForFunction(() => /skjules om 1 min/.test(document.querySelector('[data-testid="skjerm-kode-tid"]')?.textContent || ''))
+    assert.strictEqual(await page.getByTestId('skjerm-kode').innerText(), 'PMEC', 'fortsatt synlig etter 9 minutter')
+    await page.clock.fastForward('01:30')
+    await page.getByTestId('skjerm-kode-skjult').waitFor()
+    assert.strictEqual(await page.getByTestId('skjerm-kode').count(), 0, 'koden er borte etter 10 minutter')
+    assert.strictEqual(await page.locator('[data-testid="skjerm-qr"]').count(), 0, 'og QR-koden')
+    assert.ok(await page.getByTestId('skjerm-deltakere').isVisible(), 'antall deltakere står fortsatt')
+    await shot(page, '47-konk-skjerm-kode-skjult')
+    await page.getByTestId('vis-kode').click()
+    await page.getByTestId('skjerm-kode').waitFor()
+    assert.ok(/skjules om 10 min/.test(await page.getByTestId('skjerm-kode-tid').innerText()))
+    ok('storskjerm: koden og QR skjules etter 10 minutter og kan vises igjen')
+    await ctx.close()
   }
 
   // --- Reduced motion ---
