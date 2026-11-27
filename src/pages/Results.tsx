@@ -24,7 +24,7 @@ export default function Results() {
 
   if (loading && !data) return <Loading />
   if (error != null) return <ErrorBox error={error} />
-  if (!data) return <div className="card"><h1>Fant ikke konkurransen</h1><Link to="/">Til forsiden</Link></div>
+  if (!data) return <div className="card"><h1>Fant ikke konkurransen</h1><p>Trenger du en kode? Skriv den inn i feltet «Har du en kode?» på forsiden.</p><Link to="/">Til forsiden</Link></div>
   const { comp, results, feedback, mine } = data
   if (!results) {
     return (

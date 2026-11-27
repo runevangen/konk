@@ -1238,10 +1238,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await shot(page, '42-forside-administrer')
     // gjør C synlig og A usynlig
     const grp = (t) => page.getByRole('group', { name: `Administrer ${t}` })
-    await grp('Konkurranse C').getByRole('button', { name: /Bare med kode/ }).click()
-    await page.getByText('Konkurransen er synlig for alle.').waitFor()
-    await grp('Konkurranse A').getByRole('button', { name: /Synlig/ }).click()
-    await page.getByText('Konkurransen er nå skjult fra forsiden. Den er bare tilgjengelig med kode.').waitFor()
+    await grp('Konkurranse C').getByRole('button', { name: /Krever kode/ }).click()
+    await page.getByText('Konkurransen er åpen for alle innloggede, uten kode.').waitFor()
+    await grp('Konkurranse A').getByRole('button', { name: /Åpen for alle/ }).click()
+    await page.getByText('Konkurransen krever kode. Den er skjult fra forsiden for dem som ikke har brukt koden.').waitFor()
     assert.deepStrictEqual(state.comps.map((x) => [x.id, x.visible]), [['c1', false], ['c2', true], ['c3', true]])
     // slett: krever SLETT, og avbryt gjør ingenting
     await grp('Konkurranse B').getByRole('button', { name: /Slett/ }).click()
@@ -1636,6 +1636,28 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await page.getByTestId('rediger-skjema').waitFor()
     assert.ok(await y(page.getByTestId('rediger-skjema')) > (await y(page.getByText('/c ·'))), 'ny konkurranse åpnes under de andre')
     ok('admin: redigering åpnes ved kortet som redigeres (ny konkurranse nederst)')
+    await ctx.close()
+  }
+
+  {
+    // --- Ny bruker ser ingen konkurranser før koden er brukt ---
+    const state = freshState({ status: 'open' }); state.comps = [{ ...COMP, visible: false }]
+    state.joinedAlready = false
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByTestId('ingen-konkurranser').waitFor()
+    assert.ok(/Skriv inn koden/.test(await page.getByTestId('ingen-konkurranser').innerText()))
+    assert.strictEqual(await page.getByTestId('konkurranse-kort').count(), 0, 'ingen konkurranser uten kode')
+    await page.goto(BASE + '/k/julebrustest')                                // rett på adressen hjelper ikke
+    await page.getByText('Fant ikke konkurransen').waitFor()
+    assert.ok(/Trenger du en kode/.test(await page.locator('main, #root').first().innerText()))
+    await page.goto(BASE + '/')
+    await page.getByTestId('kodefelt').fill('PMEC'); await page.getByRole('button', { name: 'Gå', exact: true }).click()
+    await page.getByRole('heading', { name: /Glass 1 av 6/ }).waitFor({ timeout: 8000 })
+    await page.goto(BASE + '/')
+    await page.getByTestId('konkurranse-kort').waitFor()                     // etter koden står den i listen
+    ok('kode kreves: ny bruker ser ingenting før koden er brukt, og konkurransen huskes etterpå')
     await ctx.close()
   }
 
