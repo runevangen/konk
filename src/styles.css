@@ -338,3 +338,29 @@ table.t th, table.t td { text-align: left; padding: 8px 6px; border-bottom: 1px 
 .taste-row .bar i { display: block; height: 100%; background: var(--gold, #e8b84a); }
 .quote { background: #fff8e1; border-left: 6px solid var(--gold, #e8b84a); border-radius: 10px; padding: 12px 14px; margin: 10px 0; font: italic 1.1rem Georgia, serif; }
 .quote .who { font: .85rem system-ui, sans-serif; opacity: .8; margin-top: 4px; font-style: normal; }
+
+/* Storskjerm for konkurranse */
+.skjerm-live { display: grid; grid-template-columns: 1.6fr 1fr; gap: 28px; align-items: start; margin-top: 8px; }
+.skjerm-side { display: grid; gap: 8px; justify-items: center; text-align: center; }
+.skjerm-side .skjerm-qr { width: min(34vh, 300px); }
+.skjerm-code-liten { font-size: clamp(2rem, 9vh, 4rem); padding: 4px 18px 4px 30px; }
+.skjerm-bar { display: grid; grid-template-columns: minmax(0, 1.1fr) 1.4fr auto; gap: 12px; align-items: center; margin: 7px 0; font-size: 1.05em; }
+.skjerm-bar-label { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.skjerm-rank { display: inline-grid; place-items: center; min-width: 1.8em; height: 1.8em; border-radius: 50%; background: var(--gold, #e8b84a); color: #2a1d00; margin-right: 8px; font-weight: 700; }
+.skjerm-bar-track { display: block; height: 16px; background: rgba(255,255,255,.18); border-radius: 999px; overflow: hidden; }
+.skjerm-bar-track i { display: block; height: 100%; background: var(--gold, #e8b84a); transition: width .6s ease; }
+.skjerm-bar-val { min-width: 3.2em; text-align: right; }
+.skjerm-midt { text-align: center; padding-top: 12vh; }
+.skjerm-reveal { animation: skjerm-inn .6s ease-out; }
+.skjerm-reveal-hode { display: flex; align-items: center; gap: 18px; margin: 6px 0 10px; }
+.skjerm-reveal-hode h1 { font-size: clamp(2rem, 7vh, 4rem); }
+.skjerm-plass { display: inline-grid; place-items: center; width: 2.3em; height: 2.3em; border-radius: 50%; background: var(--gold, #e8b84a); color: #2a1d00; font: 700 clamp(2rem, 8vh, 4.5rem) Georgia, serif; }
+.skjerm-poeng-stor { margin-left: auto; font: 700 clamp(3rem, 14vh, 8rem) Georgia, serif; color: var(--gold, #e8b84a); }
+.skjerm-fakta { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 10px 0; font-size: 1.05em; }
+.skjerm-chip { background: #fff; color: #222; border-radius: 999px; padding: 4px 16px; font-weight: 700; }
+.skjerm-sitat { margin-top: 14px; font-size: clamp(1.1rem, 3.4vh, 2rem); color: #222; }
+.skjerm-kontroll { position: fixed; right: 16px; bottom: 12px; display: flex; gap: 10px; align-items: center; opacity: .35; transition: opacity .2s; }
+.skjerm-kontroll:hover, .skjerm-kontroll:focus-within { opacity: 1; }
+@keyframes skjerm-inn { from { transform: translateY(24px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .skjerm-reveal { animation: none; } .skjerm-bar-track i { transition: none; } }
+@media (max-width: 800px) { .skjerm-live { grid-template-columns: 1fr; } }

@@ -96,9 +96,9 @@ export async function saveCompetition(c: { id?: Id; slug: string; title: string;
   if (id) check(await supabase.from('konk_competitions').update(rest).eq('id', id))
   else check(await supabase.from('konk_competitions').insert(rest))
 }
-/** Slå opp en konkurranse på den korte koden. Null hvis koden ikke finnes (eller konkurransen er skjult for deg). */
-export async function competitionByCode(code: string) {
-  return check(await supabase.rpc('konk_competition_by_code', { p_code: code })) as { slug: string; title: string; status: CompetitionStatus } | null
+/** Bli med i en konkurranse med den korte koden. Kontoen husker det, så koden trengs ikke igjen (også for konkurranser som er skjult fra forsiden). Null hvis koden ikke finnes. */
+export async function joinCompetitionByCode(code: string) {
+  return check(await supabase.rpc('konk_join_by_code', { p_code: code })) as { slug: string; title: string; status: CompetitionStatus } | null
 }
 /** Admin: gi konkurransen en ny kode. */
 export async function regenCompetitionCode(id: Id) {
