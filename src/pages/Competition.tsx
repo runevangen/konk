@@ -139,7 +139,7 @@ function Stepper({ uid, comp, items, options, drafts: initial }: { uid: Id } & L
 
         <fieldset className="edit-section" disabled={locked}>
           <legend>Score</legend>
-          <p className="soft small" style={{ margin: '0 0 6px' }}>{SCORE_MIN} = uspiselig, {SCORE_MAX} = perfekt</p>
+          <p className="soft small" style={{ margin: '0 0 6px' }}>{SCORE_MIN} = dårlig, {SCORE_MAX} = fantastisk</p>
           <div className="score-grid" role="radiogroup" aria-label={`Score fra ${SCORE_MIN} til ${SCORE_MAX}`}>
             {Array.from({ length: SCORE_MAX }, (_, k) => k + 1).map((n) => (
               <label key={`${item.id}-${n}`}>
