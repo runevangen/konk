@@ -3,7 +3,7 @@ import { deleteQuizQuestions, insertQuizQuestions, listQuizQuestions, setQuizHid
 import type { Id, QuizQuestion } from '../api/types'
 import { useAuth } from '../auth'
 import { useAsync } from '../hooks'
-import { importable, LETTERS, markDuplicates, parseQuizText, questionKey, toExportJson, validateQuestion, type QuizQuestionInput } from '../lib/quizImport'
+import { importable, LETTERS, markDuplicates, parseQuizText, questionKey, toExportJson, validateQuestion, type QuizQuestionInput, validateThemeName, cleanThemeName } from '../lib/quizImport'
 import { Loading } from './ui'
 
 type Run = (f: () => Promise<unknown>) => Promise<void>
@@ -51,7 +51,11 @@ export default function QuizBank({ run }: { run: Run }) {
   const all = data.data
   useEffect(() => { setMsg(null) }, [q, fTheme, fCat, fHidden, fQuality])
 
-  const themes = useMemo(() => [...new Set((all ?? []).map((x) => x.theme))].sort(), [all])
+  const [ventende, setVentende] = useState<string[]>([])      // nye temaer uten spørsmål ennå (finnes først når et spørsmål er lagret)
+  const [nyttTema, setNyttTema] = useState<string | null>(null)   // åpen editor for nytt tema
+  const [temaFeil, setTemaFeil] = useState<string | null>(null)
+  const themes = useMemo(() => [...new Set([...(all ?? []).map((x) => x.theme), ...ventende])].sort(), [all, ventende])
+  const themeCounts = useMemo(() => { const c = new Map<string, number>(); for (const x of all ?? []) c.set(x.theme, (c.get(x.theme) ?? 0) + 1); return c }, [all])
   const cats = useMemo(() => [...new Set((all ?? []).map((x) => x.category).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, 'nb')), [all])
   const existingKeys = useMemo(() => new Set((all ?? []).map((x) => questionKey(x.theme, x.question))), [all])
   const parsed = useMemo(() => {
@@ -157,6 +161,39 @@ export default function QuizBank({ run }: { run: Run }) {
           <button className="btn" disabled={busy} onClick={() => { setForm(emptyForm(fTheme || themes[0] || 'jul')); setFormErr([]); setShowImport(false) }}>+ Nytt spørsmål</button>
           <button className="btn ghost small" aria-expanded={showImport} onClick={() => { setShowImport((v) => !v); setForm(null) }}>Importer</button>
           <button className="btn ghost small" disabled={!shown.length} onClick={download}>Eksporter JSON ({shown.length})</button>
+        </div>
+        <div style={{ marginTop: 14 }} data-testid="quiz-temaer">
+          <div className="row between" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <strong>Temaer</strong>
+            {nyttTema === null && <button className="btn ghost small" onClick={() => { setNyttTema(''); setTemaFeil(null) }} data-testid="nytt-tema">＋ Nytt tema</button>}
+          </div>
+          <div className="tag-picker" role="group" aria-label="Temaer">
+            {themes.map((t) => (
+              <button key={t} type="button" className={`tag ${fTheme === t ? 'on' : ''}`} aria-pressed={fTheme === t} onClick={() => setFTheme(fTheme === t ? '' : t)} data-testid={`tema-${t}`}>
+                {t} <span className="soft">({themeCounts.get(t) ?? 0})</span>
+              </button>
+            ))}
+            {themes.length === 0 && <span className="soft small">Ingen temaer ennå.</span>}
+          </div>
+          {nyttTema !== null && (
+            <form className="kode-editor" style={{ marginTop: 8 }} onSubmit={(e) => {
+              e.preventDefault()
+              const err = validateThemeName(nyttTema, themes)
+              if (err) { setTemaFeil(err); return }
+              const navn = cleanThemeName(nyttTema)
+              setVentende((v) => [...v, navn]); setFTheme(navn); setNyttTema(null); setTemaFeil(null)
+              setForm(emptyForm(navn)); setFormErr([]); setShowImport(false)
+            }}>
+              <label className="field" htmlFor="nytt-tema-navn" style={{ margin: 0 }}>Navn på nytt tema</label>
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <input id="nytt-tema-navn" type="text" value={nyttTema} maxLength={40} autoFocus autoComplete="off" onChange={(e) => { setNyttTema(e.target.value); setTemaFeil(null) }} style={{ flex: 1, minWidth: '10em' }} />
+                <button className="btn green small" disabled={!nyttTema.trim()}>Opprett og legg til spørsmål</button>
+                <button type="button" className="btn ghost small" onClick={() => { setNyttTema(null); setTemaFeil(null) }}>Avbryt</button>
+              </div>
+              {temaFeil && <p className="error" role="alert" style={{ margin: '6px 0 0' }}>{temaFeil}</p>}
+              <p className="soft small" style={{ margin: '6px 0 0' }}>Temaet står i lista med en gang, og blir lagret første gang du lagrer et spørsmål i det.</p>
+            </form>
+          )}
         </div>
         <label className="field" htmlFor="quiz-sok" style={{ marginTop: 12 }}>Søk</label>
         <input id="quiz-sok" type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Søk i spørsmål, alternativer og kategori" autoComplete="off" />

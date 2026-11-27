@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { importable, markDuplicates, parseCorrect, parseCsvTable, parseQuizText, questionKey, toExportJson, validateQuestion } from './quizImport'
+import { importable, markDuplicates, parseCorrect, parseCsvTable, parseQuizText, questionKey, toExportJson, validateQuestion, validateThemeName, cleanThemeName } from './quizImport'
 
 // Oppdiktede spørsmål: ekte quizer skal aldri ligge i repoet (det er offentlig).
 const Q = (nr: number, over: Record<string, unknown> = {}) => ({
@@ -139,5 +139,18 @@ describe('validateQuestion og eksport', () => {
     const qs = r.rows.map((x) => x.question!)
     const again = parseQuizText(toExportJson(qs), 'jul')
     expect(again.rows.map((x) => x.question)).toEqual(qs)
+  })
+})
+
+describe('validateThemeName', () => {
+  it('krever navn og avviser for langt', () => {
+    expect(validateThemeName('  ', [])).toMatch(/Skriv/)
+    expect(validateThemeName('x'.repeat(41), [])).toMatch(/maks 40/)
+    expect(validateThemeName('Påske', ['jul'])).toBeNull()
+  })
+  it('avviser tema som finnes, uavhengig av store bokstaver og mellomrom', () => {
+    expect(validateThemeName('JUL', ['jul'])).toMatch(/finnes allerede/)
+    expect(validateThemeName('  Norsk   historie ', ['norsk historie'])).toMatch(/finnes allerede/)
+    expect(cleanThemeName('  Norsk   historie ')).toBe('Norsk historie')
   })
 })
