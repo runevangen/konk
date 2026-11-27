@@ -1737,6 +1737,36 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await ctx.close()
   }
 
+  {
+    // --- Admin: bruksanvisning ---
+    const state = freshState({ admin: true })
+    const { ctx, page } = await newPage(browser, state)
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.getByRole('link', { name: 'Admin' }).click()
+    await page.getByRole('tab', { name: 'Bruksanvisning' }).click()
+    await page.getByTestId('admin-hjelp').waitFor()
+    assert.strictEqual(await page.getByRole('heading', { name: 'Bruksanvisning for admin' }).count(), 1)
+    assert.strictEqual(await page.getByRole('combobox', { name: /Konkurranse/ }).count(), 0, 'ingen konkurranse-velger på hjelpesiden')
+    assert.ok((await page.locator('.hjelp-del').count()) >= 10, 'flere deler')
+    assert.strictEqual(await page.locator('.hjelp-del[open]').count(), 1, 'bare første del er åpen')
+    await page.getByTestId('hjelp-apne-alle').click()
+    assert.strictEqual(await page.locator('.hjelp-del:not([open])').count(), 0)
+    const tekst = await page.getByTestId('admin-hjelp').innerText()
+    for (const ord of ['romkode', 'Storskjerm', 'Dagens sitat', 'Nytt tema', 'Før kvelden', 'Krever kode', 'Start quizen', 'Vis koden i 10 min']) assert.ok(tekst.includes(ord) || tekst.toLowerCase().includes(ord.toLowerCase()), 'bruksanvisningen nevner ' + ord)
+    // innholdsfortegnelsen åpner og går til delen
+    await page.getByRole('button', { name: 'Lukk alle' }).click()
+    await page.getByRole('link', { name: 'Før kvelden: sjekkliste' }).click()
+    assert.strictEqual(await page.locator('#hjelp-for-kvelden').evaluate((d) => d.open), true)
+    for (const w of [390, 320]) {
+      await page.setViewportSize({ width: w, height: 800 })
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, `horisontal scroll i bruksanvisningen ved ${w}px`)
+    }
+    await shot(page, '50-admin-bruksanvisning')
+    ok('admin: bruksanvisning som egen fane med innholdsfortegnelse, åpne/lukke alle og ingen sidescroll')
+    await ctx.close()
+  }
+
   // --- Reduced motion ---
   {
     const state = freshState()

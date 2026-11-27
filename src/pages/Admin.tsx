@@ -1,3 +1,4 @@
+import { AdminHjelp } from '../components/AdminHjelp'
 import { KodeRad } from '../components/KodeRad'
 import { useEffect, useState, type FormEvent } from 'react'
 import {
@@ -13,7 +14,7 @@ import { ErrorBox, Loading, StatusBadge } from '../components/ui'
 import { useAsync } from '../hooks'
 import { isValidPin, isWeakPin, normalizePin, validateSlug } from '../lib/validation'
 
-const TABS = ['Konkurranser', 'Glass og fasit', 'Gjetteliste', 'Brukere', 'Svar', 'Moderering', 'Quiz-spørsmål'] as const
+const TABS = ['Konkurranser', 'Glass og fasit', 'Gjetteliste', 'Brukere', 'Svar', 'Moderering', 'Quiz-spørsmål', 'Bruksanvisning'] as const
 type Tab = (typeof TABS)[number]
 
 export default function Admin() {
@@ -30,7 +31,7 @@ export default function Admin() {
         {TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}
       </div>
       {comps.error != null && <ErrorBox error={comps.error} />}
-      {tab !== 'Konkurranser' && tab !== 'Brukere' && tab !== 'Quiz-spørsmål' && comps.data && (
+      {tab !== 'Konkurranser' && tab !== 'Brukere' && tab !== 'Quiz-spørsmål' && tab !== 'Bruksanvisning' && comps.data && (
         <label className="field muted-on-bg">Konkurranse
           <select value={compId} onChange={(e) => setCompId(e.target.value)}>
             {comps.data.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
@@ -44,6 +45,7 @@ export default function Admin() {
       {tab === 'Svar' && comp && <AnswersTab comp={comp} />}
       {tab === 'Moderering' && comp && <ModerationTab comp={comp} />}
       {tab === 'Quiz-spørsmål' && <QuizTab />}
+      {tab === 'Bruksanvisning' && <AdminHjelp />}
     </>
   )
 }
