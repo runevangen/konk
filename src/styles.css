@@ -45,7 +45,6 @@ a { color: var(--gold); }
 .app-header { background: var(--bg-2); border-bottom: 3px solid var(--gold); padding: 10px var(--gutter); position: sticky; top: 0; z-index: 20; }
 .app-header-inner { max-width: 760px; margin: 0 auto; display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .brand { font: 700 1.4rem Georgia, serif; color: var(--on-bg); text-decoration: none; display: flex; gap: 8px; align-items: center; }
-.brand span.dot { color: var(--gold); }
 .nav { display: flex; gap: 4px; flex-wrap: wrap; }
 /* «Konkurranser» er lengre enn gamle «Konk»: litt mindre logo og tettere meny på smale skjermer */
 @media (max-width: 430px) {
