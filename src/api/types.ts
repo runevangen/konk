@@ -2,7 +2,7 @@ export type Id = string
 export type CompetitionStatus = 'draft' | 'open' | 'closed'
 
 export interface Office { id: Id; name: string }
-export interface Competition { id: Id; slug: string; title: string; kind: string; status: CompetitionStatus; live_board: boolean; live_board_names: boolean; visible: boolean; sort_order: number }
+export interface Competition { id: Id; slug: string; title: string; kind: string; status: CompetitionStatus; live_board: boolean; live_board_names: boolean; visible: boolean; sort_order: number; code: string }
 export interface Item { id: Id; competition_id: Id; position: number; label: string; image_path: string | null }
 export interface GuessOption { id: Id; competition_id: Id; label: string }
 export interface Entry {

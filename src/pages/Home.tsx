@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { countItems, deleteCompetition, listCompetitions, myProgress, saveCompetitionOrder, setCompetitionVisible } from '../api/data'
+import { useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { isCode, normalizeCode } from '../lib/quiz'
+import { countItems, deleteCompetition, regenCompetitionCode, listCompetitions, myProgress, saveCompetitionOrder, setCompetitionVisible } from '../api/data'
 import { errorMessage } from '../api/functions'
 import { moveInOrder } from '../lib/competitionOrder'
 import type { Competition } from '../api/types'
@@ -22,6 +23,9 @@ export default function Home() {
   const { profile } = useAuth()
   const { data, error, loading, reload, setData } = useAsync(load, [])
   const isAdmin = !!profile?.is_admin
+  const nav = useNavigate()
+  const [kode, setKode] = useState('')
+  const goKode = (e: FormEvent) => { e.preventDefault(); if (isCode(kode)) nav(`/kode/${kode}`) }
   const [manage, setManage] = useState(false)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [typed, setTyped] = useState('')
@@ -50,6 +54,16 @@ export default function Home() {
   return (
     <>
       <h1>God jul{profile ? `, ${profile.display_name}` : ''}!</h1>
+      <form className="card" onSubmit={goKode} aria-label="Bli med med kode">
+        <h2 style={{ marginTop: 0 }}>Har du en kode?</h2>
+        <div className="row" style={{ gap: 8 }}>
+          <input className="pin" type="text" inputMode="text" autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false} maxLength={4}
+            aria-label="Kode til en konkurranse eller quiz" placeholder="ABCD" value={kode} onChange={(e) => setKode(normalizeCode(e.target.value))}
+            style={{ letterSpacing: '.3em', textAlign: 'center', fontWeight: 700, flex: 1 }} data-testid="kodefelt" />
+          <button className="btn green" disabled={!isCode(kode)}>Gå</button>
+        </div>
+        <p className="soft small" style={{ margin: '6px 0 0' }}>Koden står på skjermen. Den gir deg en konkurranse eller en quiz.</p>
+      </form>
       <div className="card">
         <h2>🎯 Quiz</h2>
         <p className="soft">Party-quiz med romkode: svar raskt og riktig mot kollegene.</p>
@@ -73,7 +87,9 @@ export default function Home() {
             <div className="manage-bar" role="group" aria-label={`Administrer ${c.title}`}>
               <button className="btn ghost small" onClick={() => move(c.id, -1)} disabled={idx === 0} aria-label={`Flytt ${c.title} opp`}>▲</button>
               <button className="btn ghost small" onClick={() => move(c.id, 1)} disabled={idx === data.length - 1} aria-label={`Flytt ${c.title} ned`}>▼</button>
+              <span className="badge" title="Romkode" data-testid="romkode">Kode {c.code}</span>
               <button className="btn ghost small" onClick={() => toggleVisible(c.id, !c.visible)} aria-pressed={c.visible}>{c.visible ? '👁 Synlig' : '🚫 Usynlig'}</button>
+              <button className="btn ghost small" onClick={() => { if (confirm('Lage en ny kode? Den gamle slutter å virke.')) void run(async () => { const nyKode = await regenCompetitionCode(c.id); setData((data ?? []).map((r) => (r.c.id === c.id ? { ...r, c: { ...r.c, code: nyKode } } : r))) }, 'Ny kode er laget.') }}>Ny kode</button>
               <button className="btn ghost small danger" onClick={() => { setConfirmId(confirmId === c.id ? null : c.id); setTyped('') }}>🗑 Slett</button>
             </div>
           )}

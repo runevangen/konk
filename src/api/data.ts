@@ -24,13 +24,13 @@ export async function updateProfile(userId: Id, patch: { display_name: string; a
   check(r)
 }
 export async function listCompetitions(includeDraft = false) {
-  let q = supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board,live_board_names,visible,sort_order').order('sort_order').order('title')
+  let q = supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board,live_board_names,visible,sort_order,code').order('sort_order').order('title')
   if (!includeDraft) q = q.neq('status', 'draft')
   return check(await q) as Competition[]
 }
 export async function getCompetition(slug: string) {
   return check(
-    await supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board,live_board_names,visible,sort_order').eq('slug', slug).maybeSingle(),
+    await supabase.from('konk_competitions').select('id,slug,title,kind,status,live_board,live_board_names,visible,sort_order,code').eq('slug', slug).maybeSingle(),
   ) as Competition | null
 }
 export async function listItems(competitionId: Id) {
@@ -95,6 +95,14 @@ export async function saveCompetition(c: { id?: Id; slug: string; title: string;
   const { id, ...rest } = c
   if (id) check(await supabase.from('konk_competitions').update(rest).eq('id', id))
   else check(await supabase.from('konk_competitions').insert(rest))
+}
+/** Slå opp en konkurranse på den korte koden. Null hvis koden ikke finnes (eller konkurransen er skjult for deg). */
+export async function competitionByCode(code: string) {
+  return check(await supabase.rpc('konk_competition_by_code', { p_code: code })) as { slug: string; title: string; status: CompetitionStatus } | null
+}
+/** Admin: gi konkurransen en ny kode. */
+export async function regenCompetitionCode(id: Id) {
+  return check(await supabase.rpc('konk_regen_comp_code', { p_id: id })) as string
 }
 /** Skjul eller vis en konkurranse for alle andre enn admin. */
 export async function setCompetitionVisible(id: Id, visible: boolean) {
