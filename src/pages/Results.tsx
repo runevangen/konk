@@ -35,11 +35,11 @@ export default function Results() {
       </div>
     )
   }
-  return <ResultView uid={uid} compId={comp.id} title={comp.title} results={results} feedback={feedback} mine={mine} reload={reload} />
+  return <ResultView uid={uid} compId={comp.id} slug={comp.slug} title={comp.title} results={results} feedback={feedback} mine={mine} reload={reload} />
 }
 
-function ResultView({ uid, compId, title, results, feedback, mine, reload }: {
-  uid: Id; compId: Id; title: string; results: R; feedback: FeedbackRow[]; mine: MyFeedback[]; reload: () => Promise<void>
+function ResultView({ uid, compId, slug, title, results, feedback, mine, reload }: {
+  uid: Id; compId: Id; slug: string; title: string; results: R; feedback: FeedbackRow[]; mine: MyFeedback[]; reload: () => Promise<void>
 }) {
   const [err, setErr] = useState<string | null>(null)
   const ranked = rankBy(results.items, (i) => i.avg_score)
@@ -66,6 +66,7 @@ function ResultView({ uid, compId, title, results, feedback, mine, reload }: {
   return (
     <>
       <h1>Resultat: {title}</h1>
+      <p><Link className="btn gold" to={`/k/${slug}/mine`} data-testid="til-mine-gjetninger">🎯 Se hva du gjettet</Link></p>
       {err && <div className="on-bg-error" role="alert">{err}</div>}
 
       <section className="card" aria-labelledby="tot">
