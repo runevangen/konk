@@ -187,7 +187,7 @@ function makeBackend(state) {
         overall: { n_entries: 7 + bump, participants: 3, avg: 7.2, hits: 3, guesses: 7, hit_rate: 3 / 7 },
         offices: [
           { office_id: 'of1', name: 'Oslo', avg_score: 7.8, n_entries: 4, participants: 2, hits: 3, guesses: 4, hit_rate: 0.75 },
-          { office_id: 'of2', name: 'Stavanger', avg_score: null, n_entries: 1, participants: 1, hits: 0, guesses: 1, hit_rate: null },
+          { office_id: 'of2', name: 'Stavanger', avg_score: null, n_entries: state.stavangerTom ? 0 : 1, participants: state.stavangerTom ? 0 : 1, hits: 0, guesses: state.stavangerTom ? 0 : 1, hit_rate: null },
         ],
         items: [
           { item_id: 'i1', position: 1, label: 'Glass 1', brus: state.names ? 'Ringnes' : null, avg_score: 6.5 + bump, n: 3, hits: 1, guesses: 3, hit_rate: 1 / 3, by_office: [off('of1', 'Oslo', 7, 2, 1, 2), off('of2', 'Stavanger', null, 1, 0, 1)] },
@@ -1369,6 +1369,9 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
       assert.strictEqual(await page.getByTestId('skjerm-kode').innerText(), 'PMEC')
       await page.locator('[data-testid="skjerm-qr"] svg').waitFor()
       assert.ok(/3 deltakere/.test(await page.getByTestId('skjerm-deltakere').innerText()))
+      const kontorer = await page.getByTestId('skjerm-kontor').allInnerTexts()
+      assert.strictEqual(kontorer.length, 2, 'begge kontorene vises')
+      assert.ok(/Stavanger/.test(kontorer[1]) && /venter på svar/.test(kontorer[1]), 'Stavanger har deltaker men ingen snitt ennå')
       assert.strictEqual(await page.getByText('Ringnes').count(), 0, 'navn på enhet vises ikke når admin har det av')
       await fit(page, 'live'); await shot(page, '43-konk-skjerm-live')
       await ctx.close()
@@ -1464,6 +1467,21 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     assert.strictEqual(await v.page.getByTestId('quiz-bryter').count(), 0, 'bryteren er bare for admin')
     ok('forsiden: admin skjuler/viser quiz-kortet; vanlige brukere ser det bare når det er på')
     await u.ctx.close(); await v.ctx.close()
+  }
+
+  {
+    // --- Storskjerm: et kontor uten stemmer skjules ikke, det står «ingen svar ennå» ---
+    const state = freshState({ admin: true, status: 'open', stavangerTom: true })
+    const { ctx, page } = await newPage(browser, state, { viewport: { width: 1280, height: 720 }, isMobile: false, hasTouch: false })
+    await page.goto(BASE + '/login'); await page.locator('#name').fill('Kari'); await page.locator('#pin').fill('123456'); await page.getByRole('button', { name: 'Logg inn' }).click()
+    await page.getByRole('heading', { name: /God jul/ }).waitFor()
+    await page.goto(BASE + '/k/julebrustest/skjerm')
+    await page.getByTestId('skjerm-kontor').first().waitFor()
+    const k = await page.getByTestId('skjerm-kontor').allInnerTexts()
+    assert.strictEqual(k.length, 2)
+    assert.ok(/Oslo/.test(k[0]) && /snitt/.test(k[0]) && /Stavanger/.test(k[1]) && /ingen svar ennå/.test(k[1]))
+    ok('storskjerm: kontor uten svar vises med «ingen svar ennå»')
+    await ctx.close()
   }
 
   // --- Reduced motion ---
