@@ -15,7 +15,7 @@ const jwt = (admin) => `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: UID, r
 const user = { id: UID, aud: 'authenticated', role: 'authenticated', email: 'x@konk.invalid', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }
 const session = () => ({ access_token: jwt(), refresh_token: 'r', expires_in: 3600, expires_at: 4102444800, token_type: 'bearer', user })
 
-const COMP = { id: 'c1', slug: 'julebrustest', title: 'Julebrustesten 2026', kind: 'brus', status: 'open', live_board: true, live_board_names: false }
+const COMP = { id: 'c1', slug: 'julebrustest', title: 'Julebrustesten 2026', kind: 'brus', status: 'open', live_board: true, live_board_names: false, visible: true, sort_order: 10 }
 const ITEMS = ['Glass 1', 'Glass 2', 'Glass 3', 'Glass 4', 'Glass 5', 'Glass 6'].map((l, i) => ({ id: `i${i + 1}`, competition_id: 'c1', position: i + 1, label: l, image_path: null }))
 const OPTIONS = ['Mineralvann', 'Julebrus A', 'Julebrus B', 'Solo', 'Pepsi Jul'].map((l, i) => ({ id: `o${i + 1}`, competition_id: 'c1', label: l }))
 const RESULTS = {
@@ -334,6 +334,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, name + '.p
     await tavleLink.waitFor()
     assert.strictEqual(await tavleLink.getAttribute('href'), '/k/julebrustest/tavle')
     await shot(page, '16-forside-snarvei')
+    // hovedhandlingen er en gul knapp i samme stil som «Se live tavle»
+    const hoved = page.getByTestId('hovedhandling')
+    assert.ok(/Se og endre svarene dine/.test(await hoved.innerText()))
+    assert.strictEqual(await hoved.getAttribute('class'), await tavleLink.getAttribute('class'), 'samme knappestil som live tavle')
     await page.getByText('Se og endre svarene dine').click()
     await page.getByRole('heading', { name: 'Mine svar' }).waitFor()
     await page.getByText('2 av 6 glass besvart').waitFor()
